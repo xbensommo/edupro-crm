@@ -1,0 +1,1 @@
+<template><div>JournalEntriese Details</div></template>

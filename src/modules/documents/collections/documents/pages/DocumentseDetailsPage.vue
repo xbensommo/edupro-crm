@@ -1,0 +1,1 @@
+<template><div>Documentse Details</div></template>

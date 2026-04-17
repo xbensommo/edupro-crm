@@ -1,0 +1,47 @@
+{
+  "title": "EDUPRO BALANCE SHEET",
+  "columns": [
+    { "data": "date", "title": "Date" },
+    { "data": "income", "title": "Income" },
+    { "data": "expenses", "title": "Expenses" },
+    { "data": "total", "title": "Total" }
+  ],
+  "data": [
+    {
+      "date": "1 Dec-31 Dec",
+      "income": 7520,
+      "expenses": 3741.98,
+      "total": 3778.02
+    },
+    {
+      "date": "1 Jan-31 Jan",
+      "income": 3800,
+      "expenses": 1706.98,
+      "total": 2093.02
+    },
+    {
+      "date": "1 Feb-29 Feb",
+      "income": 1530,
+      "expenses": 6171.98,
+      "total": -4641.98
+    },
+    {
+      "date": "1 March-31 March",
+      "income": 6300,
+      "expenses": 3023.69,
+      "total": 3276.31
+    },
+    {
+      "date": "1 April-30 April",
+      "income": 8700,
+      "expenses": 5724.54,
+      "total": 2975.46
+    },
+    {
+      "date": "1 May-31 May",
+      "income": 6120,
+      "expenses": 2961.98,
+      "total": 3158.02
+    }
+  ]
+}

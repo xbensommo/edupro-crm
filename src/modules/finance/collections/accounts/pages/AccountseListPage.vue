@@ -1,0 +1,1 @@
+<template><div>Accountse List</div></template>

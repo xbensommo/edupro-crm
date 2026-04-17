@@ -1,0 +1,82 @@
+/**
+ * @file booking/definitions/bookings.definitions.js
+ * @description Guest and staff bookings for EduProLIC services.
+ */
+
+import { FIELD_TYPES, defineCollection } from '@xbensommo/shard-provider';
+
+export default defineCollection({
+  name: 'bookings',
+  shard: { type: 'monthly', field: 'scheduledStart' },
+  schema: {
+    bookingCode: { type: FIELD_TYPES.STRING, required: true, searchable: true, sortable: true, filterable: true },
+    serviceId: { type: FIELD_TYPES.STRING, required: true, filterable: true },
+    clientId: { type: FIELD_TYPES.STRING, required: false, filterable: true },
+    guestName: { type: FIELD_TYPES.STRING, required: false, searchable: true },
+    guestPhone: { type: FIELD_TYPES.STRING, required: false, searchable: true, filterable: true },
+    guestEmail: { type: FIELD_TYPES.STRING, required: false, searchable: true, filterable: true },
+    consultantId: { type: FIELD_TYPES.STRING, required: false, filterable: true },
+    engagementId: { type: FIELD_TYPES.STRING, required: false, filterable: true },
+    scheduledStart: { type: FIELD_TYPES.TIMESTAMP, required: true, filterable: true, sortable: true },
+    scheduledEnd: { type: FIELD_TYPES.TIMESTAMP, required: true, filterable: true, sortable: true },
+    bookingChannel: { type: FIELD_TYPES.STRING, required: false, filterable: true },
+    status: { type: FIELD_TYPES.STRING, required: false, filterable: true, sortable: true },
+    notes: { type: FIELD_TYPES.STRING, required: false, searchable: true },
+    requiresFollowUp: { type: FIELD_TYPES.BOOLEAN, required: false, filterable: true },
+    convertedToClient: { type: FIELD_TYPES.BOOLEAN, required: false, filterable: true },
+    createdBy: { type: FIELD_TYPES.STRING, required: false, filterable: true },
+    createdAt: { type: FIELD_TYPES.TIMESTAMP, readonly: true, system: true, sortable: true, filterable: true },
+    updatedAt: { type: FIELD_TYPES.TIMESTAMP, readonly: true, system: true, sortable: true },
+  },
+  writableFields: [
+    'bookingCode',
+    'serviceId',
+    'clientId',
+    'guestName',
+    'guestPhone',
+    'guestEmail',
+    'consultantId',
+    'engagementId',
+    'scheduledStart',
+    'scheduledEnd',
+    'bookingChannel',
+    'status',
+    'notes',
+    'requiresFollowUp',
+    'convertedToClient',
+    'createdBy',
+  ],
+  updateableFields: [
+    'serviceId',
+    'clientId',
+    'guestName',
+    'guestPhone',
+    'guestEmail',
+    'consultantId',
+    'engagementId',
+    'scheduledStart',
+    'scheduledEnd',
+    'bookingChannel',
+    'status',
+    'notes',
+    'requiresFollowUp',
+    'convertedToClient',
+  ],
+  indexes: [
+    { fields: ['bookingCode'] },
+    { fields: ['consultantId', 'scheduledStart'] },
+    { fields: ['status', 'scheduledStart'] },
+    { fields: ['serviceId', 'createdAt'] },
+    { fields: ['clientId', 'createdAt'] },
+  ],
+  search: {
+    mode: 'token-array',
+    fields: ['bookingCode', 'guestName', 'guestPhone', 'guestEmail', 'notes'],
+  },
+  rules: {
+    read: 'auth',
+    create: 'publicOrAuth',
+    update: 'auth',
+    delete: 'adminOrManager',
+  },
+});

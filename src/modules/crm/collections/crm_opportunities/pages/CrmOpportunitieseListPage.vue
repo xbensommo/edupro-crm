@@ -1,0 +1,1 @@
+<template><div>CrmOpportunitiese List</div></template>

@@ -1,0 +1,37 @@
+<template>
+  <div>
+    <AppOverlay v-if="store.loading" />
+    <Toaster position="top-center" richColors />
+    <RouterView />
+    <Cookie />
+    <ConfirmModal />
+  </div>
+</template>
+
+<script setup>
+import { onMounted, watch } from 'vue';
+import {  RouterView } from "vue-router";
+import { Toaster, toast } from 'vue-sonner';
+
+import AppOverlay from '@app/components/Overlay.vue';
+import Cookie from "@app/components/CookieBanner.vue"
+import { useAppStore } from '@app/stores/appStore'
+import ConfirmModal from '@action_modal/ui/modals/ConfirmModal.vue';
+
+const store = useAppStore(); 
+
+
+
+onMounted(() => {
+  console.log('EduPro CRM System v1.0.0 - Ready');
+});
+
+// 3. Error Monitoring: Auto-toast errors from the global state
+watch(() => store.error, (newError) => {
+  if (newError) {
+    toast.error("Security Alert", {
+      description: typeof newError === 'string' ? newError : newError.message,
+    });
+  }
+});
+</script>

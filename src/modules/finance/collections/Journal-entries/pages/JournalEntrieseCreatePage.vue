@@ -1,0 +1,1 @@
+<template><div>Create JournalEntriese</div></template>

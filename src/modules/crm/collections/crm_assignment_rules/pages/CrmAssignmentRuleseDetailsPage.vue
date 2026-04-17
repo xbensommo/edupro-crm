@@ -1,0 +1,1 @@
+<template><div>CrmAssignmentRulese Details</div></template>

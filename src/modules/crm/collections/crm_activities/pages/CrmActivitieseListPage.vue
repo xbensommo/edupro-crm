@@ -1,0 +1,1 @@
+<template><div>CrmActivitiese List</div></template>

@@ -1,0 +1,1 @@
+<template><div>Clientse Details</div></template>

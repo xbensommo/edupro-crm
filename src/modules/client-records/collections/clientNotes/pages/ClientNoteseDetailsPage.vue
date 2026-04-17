@@ -1,0 +1,1 @@
+<template><div>ClientNotese Details</div></template>

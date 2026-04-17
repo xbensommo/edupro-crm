@@ -1,0 +1,1 @@
+<template><form><div>JournalEntriese Form</div></form></template>

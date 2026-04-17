@@ -1,0 +1,1 @@
+<template><form><div>Accountse Form</div></form></template>

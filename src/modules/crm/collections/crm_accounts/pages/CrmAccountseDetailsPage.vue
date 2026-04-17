@@ -1,0 +1,1 @@
+<template><div>CrmAccountse Details</div></template>

@@ -1,0 +1,1 @@
+<template><div>CrmAttachmentse Details</div></template>

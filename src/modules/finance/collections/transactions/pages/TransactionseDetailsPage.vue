@@ -1,0 +1,1 @@
+<template><div>Transactionse Details</div></template>

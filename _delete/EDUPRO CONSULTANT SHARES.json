@@ -1,0 +1,54 @@
+{
+  "title": "EDUPRO CONSULTANT SHARES",
+  "data": [
+    {
+      "consultant": "ruzendo",
+      "client": "junias",
+      "sharesAmount": 300,
+      "dateOfSubmission": "31-March",
+      "comments": "received"
+    },
+    {
+      "consultant": "ruzendo",
+      "client": "Muyenga",
+      "sharesAmount": 300,
+      "dateOfSubmission": "30-March",
+      "comments": "received"
+    },
+    {
+      "consultant": "ruzendo",
+      "client": "christine",
+      "sharesAmount": 180,
+      "dateOfSubmission": "28-March",
+      "comments": "received"
+    },
+    {
+      "consultant": "lucas",
+      "client": "petrus",
+      "sharesAmount": 1800,
+      "dateOfSubmission": "31-March",
+      "comments": "received"
+    },
+    {
+      "consultant": "felicitas",
+      "client": "secilia",
+      "sharesAmount": 1530,
+      "dateOfSubmission": "02-April",
+      "comments": "received"
+    },
+    {
+      "consultant": "nanja",
+      "client": "christophine",
+      "sharesAmount": 300,
+      "dateOfSubmission": "02-April",
+      "comments": "received"
+    },
+    {
+      "consultant": "Felicitas",
+      "client": "annastacia",
+      "sharesAmount": 800,
+      "dateOfSubmission": "06-April",
+      "comments": "received"
+    }
+  ]
+}

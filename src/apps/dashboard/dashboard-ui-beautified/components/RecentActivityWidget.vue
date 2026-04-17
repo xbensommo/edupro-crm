@@ -1,0 +1,56 @@
+<template>
+  <DashboardWidgetCard title="Recent Activity" description="Latest operational activity pulled from the root store or activity collections.">
+    <div v-if="items.length" class="space-y-4">
+      <article
+        v-for="item in items"
+        :key="item.id"
+        class="list-row items-start bg-surface-2"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h4 class="text-sm font-semibold text-[var(--color-text)]">
+              {{ item.title }}
+            </h4>
+            <p class="mt-1 text-sm leading-6 text-soft">
+              {{ item.description }}
+            </p>
+          </div>
+          <span class="whitespace-nowrap text-xs text-muted">
+            {{ formatTimestamp(item.timestamp) }}
+          </span>
+        </div>
+      </article>
+    </div>
+    <div v-else class="empty-state px-6 py-10">
+      <p class="text-sm text-muted">
+        No recent activity is available yet.
+      </p>
+    </div>
+  </DashboardWidgetCard>
+</template>
+
+<script setup>
+/**
+ * @file apps/dashboard/components/RecentActivityWidget.vue
+ * @description Recent activity widget for the dashboard starter app.
+ */
+
+import DashboardWidgetCard from './DashboardWidgetCard.vue';
+
+defineProps({
+  items: {
+    type: Array,
+    default: () => [],
+  },
+});
+
+function formatTimestamp(value) {
+  if (!value) return '—';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-NA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}
+</script>

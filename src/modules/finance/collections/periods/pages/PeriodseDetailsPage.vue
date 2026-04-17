@@ -1,0 +1,1 @@
+<template><div>Periodse Details</div></template>

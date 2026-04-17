@@ -1,0 +1,55 @@
+{
+  "title": "EDUPRO EXPENSE SHEET",
+  "columns": [
+    { "data": "date", "title": "Date" },
+    { "data": "description", "title": "Description" },
+    { "data": "amount", "title": "Amount" }
+  ],
+  "data": [
+    {
+      "date": "31-Dec",
+      "description": "salary",
+      "amount": 1000
+    },
+    {
+      "date": "31-Dec",
+      "description": "grammarly",
+      "amount": 581.98
+    },
+    {
+      "date": "31-Dec",
+      "description": "ralph",
+      "amount": 2160
+    },
+    {
+      "date": "12-Jan",
+      "description": "airtime",
+      "amount": 65
+    },
+    {
+      "date": "22-Jan",
+      "description": "airtime",
+      "amount": 60
+    },
+    {
+      "date": "31-Jan",
+      "description": "salary",
+      "amount": 1000
+    },
+    {
+      "date": "31-Jan",
+      "description": "grammarly",
+      "amount": 581.98
+    },
+    {
+      "date": "02-Feb",
+      "description": "Clients shirts",
+      "amount": 620
+    },
+    {
+      "date": "10-Feb",
+      "description": "airtime",
+      "amount": 60
+    }
+  ]
+}
