@@ -7,7 +7,7 @@ import { FIELD_TYPES, defineCollection } from '@xbensommo/shard-provider';
 
 export default defineCollection({
   name: 'kpi_snapshots',
-  shard: { type: 'monthly', field: 'snapshotDate' },
+  shard: { type: 'none', field: 'snapshotDate' },
   schema: {
     snapshotDate: { type: FIELD_TYPES.TIMESTAMP, required: true, filterable: true, sortable: true },
     periodType: { type: FIELD_TYPES.STRING, required: true, filterable: true, sortable: true },

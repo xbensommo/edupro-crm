@@ -23,7 +23,7 @@ export { default as crmOpportunities } from './collections/crm_opportunities.def
 export { default as crmTasks } from './collections/crm_tasks.definitions.js';
 export { default as crmActivities } from './collections/crm_activities.definitions.js';
 export { default as crmNotes } from './collections/crm_notes.definitions.js';
-export { default as crmFiles } from './definitions/crm_files.definitions.js';
+export { default as crmFiles } from './collections/crm_files.definitions.js';
 export { default as crmDocuments } from './collections/crm_documents.definitions.js';
 export { default as crmMessages } from './collections/crm_messages.definitions.js';
 export { default as crmAttachments } from './collections/crm_attachments.definitions.js';

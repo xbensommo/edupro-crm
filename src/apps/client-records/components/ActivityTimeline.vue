@@ -54,7 +54,7 @@ defineProps({
  *
  * @param {unknown} value
  * @returns {string}
- */
+ */ 
 function formatDate(value) {
   if (!value) return 'No date'
 

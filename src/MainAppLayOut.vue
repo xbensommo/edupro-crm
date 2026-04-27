@@ -47,31 +47,59 @@ function inferGroup(routeRecord) {
   return 'Modules'
 }
 
+/**
+ * Infers the appropriate FontAwesome 6 icon based on route metadata.
+ * * @param {import('vue-router').RouteRecordRaw} routeRecord
+ * @returns {string} FontAwesome class string
+ */
 function inferIcon(routeRecord) {
   const haystack = [
-  routeRecord?.name,
-  routeRecord?.path,
-  routeRecord?.meta?.title,
-  routeRecord?.meta?.feature,
+    routeRecord?.name,
+    routeRecord?.path,
+    routeRecord?.meta?.title,
+    routeRecord?.meta?.feature,
   ]
-  .filter(Boolean)
-  .join(' ')
-  .toLowerCase()
-  
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  // Finance & Money
+  if (haystack.includes('finance') || haystack.includes('transaction') || haystack.includes('payment')) {
+    return 'fas fa-money-bill-transfer'
+  }
+  if (haystack.includes('payout') || haystack.includes('refund')) {
+    return 'fas fa-hand-holding-dollar'
+  }
+  if (haystack.includes('expense')) return 'fas fa-receipt'
+  if (haystack.includes('account')) return 'fas fa-building-columns'
+
+  // CRM & Client Records
+  if (haystack.includes('client') || haystack.includes('customer')) return 'fas fa-address-book'
+  if (haystack.includes('crm') || haystack.includes('engagement') || haystack.includes('work')) {
+    return 'fas fa-briefcase'
+  }
+  if (haystack.includes('activity')) return 'fas fa-clock-rotate-left'
+  if (haystack.includes('communication')) return 'fas fa-comments'
+
+  // Dashboard & Analytics
   if (haystack.includes('dashboard')) return 'fas fa-chart-line'
-  if (haystack.includes('client') || haystack.includes('customer') || haystack.includes('user')) {
-    return 'fas fa-users'
+  if (haystack.includes('report') || haystack.includes('analytics') || haystack.includes('statement')) {
+    return 'fas fa-chart-pie'
   }
-  if (haystack.includes('booking') || haystack.includes('calendar')) return 'fas fa-calendar-check'
-  if (haystack.includes('session')) return 'fas fa-video'
+
+  // System & Media
+  if (haystack.includes('media') || haystack.includes('file')) return 'fas fa-folder-open'
+  if (haystack.includes('upload')) return 'fas fa-cloud-arrow-up'
+  if (haystack.includes('user') || haystack.includes('team') || haystack.includes('profile')) {
+    return 'fas fa-user-gear'
+  }
+  if (haystack.includes('setting') || haystack.includes('preference')) return 'fas fa-sliders'
+
+  // Notifications
   if (haystack.includes('notification') || haystack.includes('alert')) return 'fas fa-bell'
-  if (haystack.includes('document') || haystack.includes('invoice') || haystack.includes('quote')) {
-    return 'fas fa-file-lines'
-  }
-  if (haystack.includes('setting')) return 'fas fa-gear'
-  if (haystack.includes('report') || haystack.includes('analytics')) return 'fas fa-chart-column'
-  
-  return 'fas fa-grid-2'
+
+  // Default fallback for EduPro Modules
+  return 'fas fa-cubes'
 }
 
 function isNotificationsRoute(routeRecord) {
@@ -176,10 +204,9 @@ const fetchNotificationCount = async () => {
       return
     }
     
-    /*await store.notificationsActions.fetchInitialPage({
-    read: false,
-    forAdmin: true,
-    })*/
+    await store.notificationsActions.fetchInitialPage({ read: false,
+
+    })
   } catch (error) {
     console.error('Failed to fetch notification count:', error)
   }
@@ -215,8 +242,8 @@ onUnmounted(() => {
           </div>
 
           <div v-if="isSidebarOpen" class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">EduPro</p>
-            <h1 class="truncate text-lg font-bold leading-tight">CRM | Totistack</h1>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/70">Portal</p>
+            <h1 class="truncate text-lg font-bold leading-tight">EduPro</h1>
           </div>
         </div>
       </div>

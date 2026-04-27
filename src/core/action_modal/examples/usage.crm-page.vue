@@ -12,7 +12,7 @@
 /**
  * @file src/examples/usage.crm-page.vue
  * @description Example usage from a CRM page.
- */
+ */ 
 
 import { useActionExecutor } from '../core/composables/use-action-executor.js';
 import { useToast } from 'vue-sonner';

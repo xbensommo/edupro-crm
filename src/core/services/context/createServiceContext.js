@@ -203,7 +203,7 @@ export function createServiceContext({
   function buildCreatedAudit(options = {}) {
     return buildCreatedAuditFields({
       now,
-      userId: options.userId ?? (getCurrentUserId() || null),
+      user_id: options.user_id  ?? (getCurrentUserId() || null),
       includeUpdatedAt: Boolean(options.includeUpdatedAt),
     })
   }
@@ -215,7 +215,7 @@ export function createServiceContext({
   function buildUpdatedAudit(options = {}) {
     return buildUpdatedAuditFields({
       now,
-      userId: options.userId ?? (getCurrentUserId() || null),
+      user_id: options.user_id  ?? (getCurrentUserId() || null),
     })
   }
 

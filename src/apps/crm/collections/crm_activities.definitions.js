@@ -7,7 +7,7 @@ import { FIELD_TYPES, defineCollection } from '@xbensommo/shard-provider';
 
 const crmActivities = defineCollection({
   name: 'crm_activities',
-  shard: { type: 'monthly', field: 'createdAt' },
+  shard: { type: 'none', field: 'createdAt' },
   schema: {
     leadId: { type: FIELD_TYPES.STRING, required: false, filterable: true },
     contactId: { type: FIELD_TYPES.STRING, required: false, filterable: true },

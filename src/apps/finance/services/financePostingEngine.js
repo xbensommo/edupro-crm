@@ -1,296 +1,160 @@
 /**
  * @file src/apps/finance/services/financePostingEngine.js
- * @description Double-entry posting engine.
+ * @description EduProLIC finance posting helpers.
  */
 
-import {
-  DEFAULT_SYSTEM_ACCOUNTS,
-  SYSTEM_ACCOUNT_KEYS,
-  createAccountResolver,
-} from './financeChartOfAccounts.js'
-import { FinanceError, invariant } from './financeErrors.js'
+import { DEFAULT_SYSTEM_ACCOUNTS, SYSTEM_ACCOUNT_KEYS, createAccountResolver } from './financeChartOfAccounts.js'
 
-/**
- * @param {number|string} value
- * @returns {number}
- */
-function toAmount(value) {
-  const amount = Number(value)
-  invariant(Number.isFinite(amount) && amount > 0, 'Amount must be greater than zero.', {
-    code: 'FINANCE_INVALID_AMOUNT',
-  })
-  return Number(amount.toFixed(2))
+function createId(prefix = 'je') {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-/**
- * @param {string} isoDate
- * @returns {string}
- */
-function toPeriodKey(isoDate) {
-  invariant(/^\d{4}-\d{2}-\d{2}/.test(isoDate), 'occurredOn must be an ISO date.', {
-    code: 'FINANCE_INVALID_DATE',
-    meta: { occurredOn: isoDate },
-  })
-  return isoDate.slice(0, 7)
+function nowIso(nowFactory) {
+  return typeof nowFactory === 'function' ? nowFactory() : new Date().toISOString()
 }
 
-/**
- * @param {Array<{ side: 'debit'|'credit', amount: number }>} lines
- */
-function assertBalanced(lines) {
-  const totalDebit = lines
-    .filter((line) => line.side === 'debit')
-    .reduce((sum, line) => sum + line.amount, 0)
-  const totalCredit = lines
-    .filter((line) => line.side === 'credit')
-    .reduce((sum, line) => sum + line.amount, 0)
-
-  invariant(totalDebit > 0 && totalCredit > 0, 'Journal entry must contain debit and credit lines.', {
-    code: 'FINANCE_EMPTY_ENTRY',
-  })
-
-  invariant(
-    Number(totalDebit.toFixed(2)) === Number(totalCredit.toFixed(2)),
-    'Journal entry is not balanced.',
-    {
-      code: 'FINANCE_UNBALANCED_ENTRY',
-      meta: { totalDebit, totalCredit },
-    },
-  )
+function createPeriodKey(isoString) {
+  return String(isoString || '').slice(0, 7)
 }
 
-/**
- * @param {string} accountId
- * @param {'debit'|'credit'} side
- * @param {number} amount
- * @param {string} memo
- * @param {(accountId: string) => { id: string } | undefined} resolveAccount
- * @returns {{ accountId: string, side: 'debit'|'credit', amount: number, memo: string }}
- */
-function createLine(accountId, side, amount, memo, resolveAccount) {
-  invariant(resolveAccount(accountId), `Unknown account '${accountId}'.`, {
-    code: 'FINANCE_UNKNOWN_ACCOUNT',
-    meta: { accountId },
-  })
+function ledgerLine(accountId, side, amount, memo = '') {
+  return { accountId, side, amount: Number(amount || 0), memo }
+}
+
+function normalizeLines(lines = []) {
+  const normalized = lines.filter((line) => Number(line?.amount || 0) > 0)
+  const totalDebit = normalized.filter((line) => line.side === 'debit').reduce((sum, line) => sum + Number(line.amount || 0), 0)
+  const totalCredit = normalized.filter((line) => line.side === 'credit').reduce((sum, line) => sum + Number(line.amount || 0), 0)
+
+  if (Number(totalDebit.toFixed(2)) !== Number(totalCredit.toFixed(2))) {
+    const error = new Error('Transaction is not balanced.')
+    error.code = 'FINANCE_UNBALANCED_TRANSACTION'
+    throw error
+  }
 
   return {
-    accountId,
-    side,
-    amount: Number(amount.toFixed(2)),
-    memo,
+    lines: normalized,
+    totalDebit: Number(totalDebit.toFixed(2)),
+    totalCredit: Number(totalCredit.toFixed(2)),
   }
 }
 
-/**
- * Build posting lines for a transaction.
- *
- * @param {object} options
- * @param {{
- *   id: string,
- *   type: 'payment'|'expense'|'payout'|'adjustment',
- *   amount: number,
- *   occurredOn: string,
- *   memo?: string,
- *   status?: string,
- *   lines?: Array<{ accountId: string, side: 'debit'|'credit', amount: number, memo?: string }>,
- *   accountOverrides?: Record<string, string>
- * }} options.transaction
- * @param {Array<{ id: string }>} [options.accounts]
- * @param {{ id?: string } | null} [options.actor]
- * @param {() => string} [options.idFactory]
- * @param {() => string} [options.nowFactory]
- * @returns {{
- *   id: string,
- *   transactionId: string,
- *   transactionType: string,
- *   status: 'posted',
- *   postedAt: string,
- *   periodKey: string,
- *   totalDebit: number,
- *   totalCredit: number,
- *   createdBy: string | null,
- *   lines: Array<{ accountId: string, side: 'debit'|'credit', amount: number, memo: string }>
- * }}
- */
-export function createPostedJournalEntry({
-  transaction,
-  accounts = DEFAULT_SYSTEM_ACCOUNTS,
-  actor = null,
-  idFactory = () => `je_${Math.random().toString(36).slice(2, 10)}`,
-  nowFactory = () => new Date().toISOString(),
-}) {
-  invariant(transaction?.id, 'Transaction id is required.', { code: 'FINANCE_TRANSACTION_ID_REQUIRED' })
-  invariant(transaction?.type, 'Transaction type is required.', { code: 'FINANCE_TRANSACTION_TYPE_REQUIRED' })
-  invariant(transaction?.occurredOn, 'Transaction occurredOn is required.', { code: 'FINANCE_TRANSACTION_DATE_REQUIRED' })
-
-  const amount = toAmount(transaction.amount)
+function buildLinesForTransaction(transaction, accounts = DEFAULT_SYSTEM_ACCOUNTS) {
   const resolveAccount = createAccountResolver(accounts)
-  const memo = transaction.memo || `Posted ${transaction.type} ${transaction.id}`
-  const overrides = transaction.accountOverrides || {}
+  const amount = Number(transaction?.amount || transaction?.grossServiceAmount || transaction?.paidAmount || 0)
+  const consultantShareAmount = Number(transaction?.consultantShareAmount || transaction?.consultantShareAmountCached || 0)
+  const deductionAmount = Number(transaction?.deductionAmount || 0)
 
-  /** @type {Array<{ accountId: string, side: 'debit'|'credit', amount: number, memo: string }>} */
-  let lines = []
+  if (Array.isArray(transaction?.lines) && transaction.lines.length) {
+    return normalizeLines(transaction.lines)
+  }
 
-  switch (transaction.type) {
+  switch (transaction?.type) {
+    case 'client_payment':
     case 'payment':
-      lines = [
-        createLine(
-          overrides.cashAccountId || SYSTEM_ACCOUNT_KEYS.CASH,
-          'debit',
-          amount,
-          memo,
-          resolveAccount,
-        ),
-        createLine(
-          overrides.revenueAccountId || SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE,
-          'credit',
-          amount,
-          memo,
-          resolveAccount,
-        ),
-      ]
-      break
+      return normalizeLines([
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CASH)?.id || SYSTEM_ACCOUNT_KEYS.CASH, 'debit', amount, 'Client payment received'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.ACCOUNTS_RECEIVABLE)?.id || SYSTEM_ACCOUNT_KEYS.ACCOUNTS_RECEIVABLE, 'credit', amount, 'Reduce receivable'),
+      ])
+
+    case 'refund':
+      return normalizeLines([
+        ledgerLine(transaction?.accountOverrides?.refundAccountId || resolveAccount(SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE)?.id || SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE, 'debit', amount, 'Client refund issued'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CASH)?.id || SYSTEM_ACCOUNT_KEYS.CASH, 'credit', amount, 'Cash refunded to client'),
+      ])
+
+    case 'consultant_commission_accrual':
+      return normalizeLines([
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CONSULTANT_COST)?.id || SYSTEM_ACCOUNT_KEYS.CONSULTANT_COST, 'debit', consultantShareAmount || amount, 'Consultant commission expense'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CONSULTANT_PAYABLE)?.id || SYSTEM_ACCOUNT_KEYS.CONSULTANT_PAYABLE, 'credit', consultantShareAmount || amount, 'Consultant payable'),
+      ])
+
+    case 'consultant_payout':
+    case 'payout':
+      return normalizeLines([
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CONSULTANT_PAYABLE)?.id || SYSTEM_ACCOUNT_KEYS.CONSULTANT_PAYABLE, 'debit', amount, 'Consultant payout settlement'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CASH)?.id || SYSTEM_ACCOUNT_KEYS.CASH, 'credit', amount, 'Cash paid out'),
+      ])
+
+    case 'commission_deduction':
+      return normalizeLines([
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CONSULTANT_PAYABLE)?.id || SYSTEM_ACCOUNT_KEYS.CONSULTANT_PAYABLE, 'debit', deductionAmount || amount, 'Reduce consultant payable after review deduction'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE)?.id || SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE, 'credit', deductionAmount || amount, 'Commission deduction retained by company'),
+      ])
 
     case 'expense':
-      lines = [
-        createLine(
-          overrides.expenseAccountId || SYSTEM_ACCOUNT_KEYS.OPERATING_EXPENSE,
-          'debit',
-          amount,
-          memo,
-          resolveAccount,
-        ),
-        createLine(
-          overrides.cashAccountId || SYSTEM_ACCOUNT_KEYS.CASH,
-          'credit',
-          amount,
-          memo,
-          resolveAccount,
-        ),
-      ]
-      break
+      return normalizeLines([
+        ledgerLine(transaction?.accountOverrides?.expenseAccountId || SYSTEM_ACCOUNT_KEYS.OPERATING_EXPENSE, 'debit', amount, transaction?.memo || 'Operating expense'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CASH)?.id || SYSTEM_ACCOUNT_KEYS.CASH, 'credit', amount, 'Cash paid for expense'),
+      ])
 
-    case 'payout':
-      lines = [
-        createLine(
-          overrides.consultantCostAccountId || SYSTEM_ACCOUNT_KEYS.CONSULTANT_COST,
-          'debit',
-          amount,
-          memo,
-          resolveAccount,
-        ),
-        createLine(
-          overrides.consultantPayableAccountId || SYSTEM_ACCOUNT_KEYS.CONSULTANT_PAYABLE,
-          'credit',
-          amount,
-          memo,
-          resolveAccount,
-        ),
-      ]
-      break
+    case 'work_revenue':
+    case 'invoice_revenue':
+      return normalizeLines([
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.ACCOUNTS_RECEIVABLE)?.id || SYSTEM_ACCOUNT_KEYS.ACCOUNTS_RECEIVABLE, 'debit', amount, 'Recognize receivable'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE)?.id || SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE, 'credit', amount, 'Recognize work revenue'),
+      ])
 
     case 'adjustment':
-      invariant(Array.isArray(transaction.lines) && transaction.lines.length >= 2, 'Adjustment requires explicit lines.', {
-        code: 'FINANCE_ADJUSTMENT_LINES_REQUIRED',
-      })
-      lines = transaction.lines.map((line) => createLine(
-        line.accountId,
-        line.side,
-        toAmount(line.amount),
-        line.memo || memo,
-        resolveAccount,
-      ))
-      break
+      return normalizeLines([
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CASH)?.id || SYSTEM_ACCOUNT_KEYS.CASH, 'debit', amount, transaction?.memo || 'Adjustment'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.OWNER_EQUITY)?.id || SYSTEM_ACCOUNT_KEYS.OWNER_EQUITY, 'credit', amount, transaction?.memo || 'Adjustment'),
+      ])
 
     default:
-      throw new FinanceError(`Unsupported transaction type '${transaction.type}'.`, {
-        code: 'FINANCE_UNSUPPORTED_TRANSACTION_TYPE',
-        meta: { type: transaction?.type },
-      })
-  }
-
-  assertBalanced(lines)
-
-  const totalDebit = Number(lines
-    .filter((line) => line.side === 'debit')
-    .reduce((sum, line) => sum + line.amount, 0)
-    .toFixed(2))
-  const totalCredit = Number(lines
-    .filter((line) => line.side === 'credit')
-    .reduce((sum, line) => sum + line.amount, 0)
-    .toFixed(2))
-
-  return {
-    id: idFactory(),
-    transactionId: transaction.id,
-    transactionType: transaction.type,
-    status: 'posted',
-    postedAt: nowFactory(),
-    periodKey: toPeriodKey(transaction.occurredOn),
-    createdBy: actor?.id || null,
-    totalDebit,
-    totalCredit,
-    lines,
+      return normalizeLines([
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.CASH)?.id || SYSTEM_ACCOUNT_KEYS.CASH, 'debit', amount, transaction?.memo || 'Transaction'),
+        ledgerLine(resolveAccount(SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE)?.id || SYSTEM_ACCOUNT_KEYS.SERVICE_REVENUE, 'credit', amount, transaction?.memo || 'Transaction'),
+      ])
   }
 }
 
-/**
- * Create a reversal entry for an already-posted journal entry.
- *
- * @param {object} options
- * @param {{ id: string, transactionId: string, transactionType: string, lines: Array<{ accountId: string, side: 'debit'|'credit', amount: number, memo: string }>, totalDebit: number, totalCredit: number }} options.postedEntry
- * @param {{ id?: string } | null} [options.actor]
- * @param {string} [options.reason='Manual reversal']
- * @param {() => string} [options.idFactory]
- * @param {() => string} [options.nowFactory]
- * @returns {{
- *   id: string,
- *   transactionId: string,
- *   transactionType: string,
- *   status: 'reversal',
- *   postedAt: string,
- *   periodKey: string,
- *   totalDebit: number,
- *   totalCredit: number,
- *   reversalOfEntryId: string,
- *   createdBy: string | null,
- *   lines: Array<{ accountId: string, side: 'debit'|'credit', amount: number, memo: string }>
- * }}
- */
-export function createReversalJournalEntry({
-  postedEntry,
-  actor = null,
-  reason = 'Manual reversal',
-  idFactory = () => `je_${Math.random().toString(36).slice(2, 10)}`,
-  nowFactory = () => new Date().toISOString(),
-}) {
-  invariant(postedEntry?.id, 'Posted entry id is required.', {
-    code: 'FINANCE_POSTED_ENTRY_ID_REQUIRED',
-  })
-  invariant(Array.isArray(postedEntry?.lines) && postedEntry.lines.length > 0, 'Posted entry lines are required.', {
-    code: 'FINANCE_POSTED_ENTRY_LINES_REQUIRED',
-  })
-
-  const postedAt = nowFactory()
-  const lines = postedEntry.lines.map((line) => ({
-    ...line,
-    side: line.side === 'debit' ? 'credit' : 'debit',
-    memo: `${reason}: ${line.memo}`,
-  }))
-
-  assertBalanced(lines)
+export function createPostedJournalEntry({ transaction, accounts = DEFAULT_SYSTEM_ACCOUNTS, actor = null, idFactory = createId, nowFactory = null }) {
+  const { lines, totalDebit, totalCredit } = buildLinesForTransaction(transaction, accounts)
+  const postedAt = nowIso(nowFactory)
 
   return {
-    id: idFactory(),
-    transactionId: postedEntry.transactionId,
-    transactionType: postedEntry.transactionType,
-    status: 'reversal',
+    id: idFactory('je'),
+    transactionId: transaction?.id || transaction?.transactionId || null,
+    transactionType: transaction?.type || 'adjustment',
+    status: 'posted',
     postedAt,
-    periodKey: postedAt.slice(0, 7),
-    reversalOfEntryId: postedEntry.id,
-    createdBy: actor?.id || null,
-    totalDebit: postedEntry.totalCredit,
-    totalCredit: postedEntry.totalDebit,
+    periodKey: createPeriodKey(postedAt),
+    createdBy: actor?.id || actor?.uid || null,
+    memo: transaction?.memo || transaction?.reference || null,
+    reference: transaction?.reference || null,
+    currency: transaction?.currency || 'NAD',
+    entityId: transaction?.engagementId || transaction?.clientId || transaction?.consultantId || null,
     lines,
+    totalDebit,
+    totalCredit,
+  }
+}
+
+export function createReversalJournalEntry({ postedEntry, actor = null, reason = 'Manual reversal', idFactory = createId, nowFactory = null }) {
+  const postedAt = nowIso(nowFactory)
+  const lines = (postedEntry?.lines || []).map((line) => ({
+    ...line,
+    side: line.side === 'debit' ? 'credit' : 'debit',
+    memo: reason,
+  }))
+  const { totalDebit, totalCredit } = normalizeLines(lines)
+
+  return {
+    id: idFactory('je'),
+    transactionId: postedEntry?.transactionId || null,
+    transactionType: 'reversal',
+    status: 'posted',
+    postedAt,
+    periodKey: createPeriodKey(postedAt),
+    createdBy: actor?.id || actor?.uid || null,
+    memo: reason,
+    reference: postedEntry?.id || null,
+    reversedEntryId: postedEntry?.id || null,
+    currency: postedEntry?.currency || 'NAD',
+    entityId: postedEntry?.entityId || null,
+    lines,
+    totalDebit,
+    totalCredit,
   }
 }

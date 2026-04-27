@@ -3,20 +3,17 @@
  * @description CRM service registry entry for Totistack generated assembly.
  */
 
-import { createCrmService } from './services/crm.service.js'
+import { createCrmService } from './services/crmService.js'
 
 /**
  * Create CRM services from shared root infrastructure.
  *
- * @param {object} context
- * @param {object} context.provider
- * @param {object} [context.access]
- * @param {object} [context.logger]
+ * @param {object} [_context]
  * @returns {{ crm: ReturnType<typeof createCrmService> }}
  */
-export function createServices(context) {
+export function createServices(_context) {
   return {
-    crm: createCrmService(context),
+    crm: createCrmService(),
   }
 }
 

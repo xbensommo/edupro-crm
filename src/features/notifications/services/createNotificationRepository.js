@@ -1,153 +1,156 @@
-/** @file src/features/notifications/services/createNotificationRepository.js */
+/**
+ * @file src/features/notifications/services/createNotificationRepository.js
+ * @description Repository with one canonical runtime contract for notifications.
+ */
 
-import { createShardedActions } from '@xbensommo/shard-provider';
+import { useAppStore } from '@app/stores/appStore'
+import {
+  buildNotificationLog,
+  buildNotificationPreferences,
+  buildNotificationRecord,
+} from '../utils/buildNotificationRecord.js'
+
+/**
+ * Convert store rows into plain records with ids.
+ *
+ * @param {any[]} [rows=[]]
+ * @returns {Record<string, any>[]}
+ */
+function normalizeRows(rows = []) {
+  return rows
+    .filter(Boolean)
+    .map((entry) => {
+      const data = entry?.data && typeof entry.data === 'object' ? entry.data : entry
+      const id = entry?.id || entry?.docId || data?.id || null
+      return { id, ...data }
+    })
+}
 
 /**
  * Build a repository around shard-provider collection actions.
  *
  * @param {{
- *   provider?: any,
- *   createActions?: typeof createShardedActions,
- *   actions?: Record<string, any>,
- *   states?: Record<string, any>,
+ *   store?: any,
+ *   recipientField?: string,
+ *   now?: () => Date,
  * }} [options={}]
- * @returns {{
- *   listNotifications: (params?: Record<string, any>) => Promise<Array<Record<string, any>>>,
- *   listTemplates: () => Promise<Array<Record<string, any>>>,
- *   listLogs: (params?: Record<string, any>) => Promise<Array<Record<string, any>>>,
- *   getPreferences: (userId: string) => Promise<Record<string, any>|null>,
- *   saveNotification: (payload: Record<string, any>) => Promise<Record<string, any>>,
- *   saveLog: (payload: Record<string, any>) => Promise<Record<string, any>>,
- *   upsertPreferences: (userId: string, payload: Record<string, any>) => Promise<Record<string, any>>,
- *   markRead: (notificationId: string, payload?: Record<string, any>) => Promise<any>,
- *   markAllRead: (userId: string, ids?: string[]) => Promise<Array<any>>,
- *   archiveNotification: (notificationId: string) => Promise<any>,
- *   actions: Record<string, any>,
- *   states: Record<string, any>,
- * }}
  */
 export function createNotificationRepository(options = {}) {
-  const provider = options.provider;
-  const createActions = options.createActions || createShardedActions;
-  const states = options.states || {
-    notifications: { items: [], loading: false, error: null },
-    notification_preferences: { items: [], loading: false, error: null },
-    notification_templates: { items: [], loading: false, error: null },
-    notification_logs: { items: [], loading: false, error: null },
-  };
+  const store = options.store || useAppStore()
+  const recipientField = options.recipientField || 'user_id'
+  const now = typeof options.now === 'function' ? options.now : () => new Date()
 
   const actions = {
-    notifications:
-      options.actions?.notifications || createActions('notifications', states.notifications, provider),
-    notification_preferences:
-      options.actions?.notification_preferences ||
-      createActions('notification_preferences', states.notification_preferences, provider),
-    notification_templates:
-      options.actions?.notification_templates ||
-      createActions('notification_templates', states.notification_templates, provider),
-    notification_logs:
-      options.actions?.notification_logs || createActions('notification_logs', states.notification_logs, provider),
-  };
+    notifications: store.getCollectionActions?.('notifications') || store.notificationsActions,
+    notificationPreferences: store.getCollectionActions?.('notification_preferences') || store.notification_preferencesActions,
+    notificationTemplates: store.getCollectionActions?.('notification_templates') || store.notification_templatesActions,
+    notificationLogs: store.getCollectionActions?.('notification_logs') || store.notification_logsActions,
+  }
+
+  function requireActions(key) {
+    const target = actions[key]
+    if (!target) {
+      throw new Error(`Notification repository missing collection actions for '${key}'.`)
+    }
+    return target
+  }
 
   async function listNotifications(params = {}) {
-    const { userId, filters = [], limit = 50 } = params;
-    const mergedFilters = [...filters];
+    const notifications = requireActions('notifications')
+    const recipientId = params.recipientId || params.user_id || params.user_id || null
+    const filters = []
 
-    if (userId) {
-      mergedFilters.push({ field: 'userId', op: '==', value: userId });
+    if (recipientId) {
+      filters.push({ field: recipientField, op: '==', value: recipientId })
     }
 
-    await actions.notifications.fetchInitialPage({
-      filters: mergedFilters,
-      limit,
-      orderBy: [{ field: 'createdAt', direction: 'desc' }],
-    });
+    if (params.status) {
+      filters.push({ field: 'status', op: '==', value: params.status })
+    }
 
-    return states.notifications.items || [];
+    await notifications.fetchByFilters?.({ filters })
+    const stateRows = notifications.state?.items || store.notifications?.items || []
+    return normalizeRows(stateRows)
   }
 
   async function listTemplates() {
-    await actions.notification_templates.fetchInitialPage({
-      limit: 100,
-      orderBy: [{ field: 'createdAt', direction: 'desc' }],
-    });
-
-    return states.notification_templates.items || [];
+    const templates = requireActions('notificationTemplates')
+    await templates.fetchInitialPage?.({ pageSize: 100, sortBy: 'createdAt', sortDirection: 'desc' })
+    const stateRows = templates.state?.items || store.notification_templates?.items || []
+    return normalizeRows(stateRows)
   }
 
   async function listLogs(params = {}) {
-    const { notificationId, limit = 100 } = params;
-    const filters = [];
-
-    if (notificationId) {
-      filters.push({ field: 'notificationId', op: '==', value: notificationId });
+    const logs = requireActions('notificationLogs')
+    const filters = []
+    if (params.notificationId) {
+      filters.push({ field: 'notificationId', op: '==', value: params.notificationId })
     }
-
-    await actions.notification_logs.fetchInitialPage({
-      filters,
-      limit,
-      orderBy: [{ field: 'createdAt', direction: 'desc' }],
-    });
-
-    return states.notification_logs.items || [];
+    await logs.fetchByFilters?.({ filters })
+    const stateRows = logs.state?.items || store.notification_logs?.items || []
+    return normalizeRows(stateRows)
   }
 
-  async function getPreferences(userId) {
-    await actions.notification_preferences.fetchInitialPage({
-      filters: [{ field: 'userId', op: '==', value: userId }],
-      limit: 1,
-      orderBy: [{ field: 'updatedAt', direction: 'desc' }],
-    });
-
-    return states.notification_preferences.items?.[0] || null;
+  async function getPreferences(recipientId) {
+    const preferences = requireActions('notificationPreferences')
+    await preferences.fetchByFilters?.({ filters: [{ field: recipientField, op: '==', value: recipientId }] })
+    const rows = normalizeRows(preferences.state?.items || store.notification_preferences?.items || [])
+    return rows[0] || null
   }
 
   async function saveNotification(payload) {
-    const saved = await actions.notifications.add(payload);
-    return saved;
+    const notifications = requireActions('notifications')
+    return notifications.add(buildNotificationRecord(payload, { recipientField, now }))
   }
 
   async function saveLog(payload) {
-    const saved = await actions.notification_logs.add(payload);
-    return saved;
+    const logs = requireActions('notificationLogs')
+    return logs.add(buildNotificationLog(payload, { recipientField, now }))
   }
 
-  async function upsertPreferences(userId, payload) {
-    const current = await getPreferences(userId);
+  async function upsertPreferences(recipientId, payload = {}) {
+    const preferences = requireActions('notificationPreferences')
+    const current = await getPreferences(recipientId)
+    const normalized = buildNotificationPreferences(recipientId, payload, { recipientField, now })
 
     if (current?.id) {
-      await actions.notification_preferences.update(current.id, payload);
-      return { ...current, ...payload };
+      await preferences.update(current.id, {
+        ...normalized,
+        createdAt: current.createdAt || normalized.createdAt,
+      })
+      return { ...current, ...normalized }
     }
 
-    return actions.notification_preferences.add({
-      userId,
-      ...payload,
-    });
+    return preferences.add(normalized)
   }
 
   async function markRead(notificationId, payload = {}) {
-    return actions.notifications.update(notificationId, {
-      readAt: payload.readAt || new Date().toISOString(),
+    const notifications = requireActions('notifications')
+    return notifications.update(notificationId, {
+      readAt: payload.readAt || now().toISOString(),
       status: payload.status || 'read',
-      updatedAt: new Date().toISOString(),
-    });
+      updatedAt: now().toISOString(),
+    })
   }
 
-  async function markAllRead(userId, ids = []) {
-    const targetIds = ids.length ? ids : (await listNotifications({ userId, limit: 200 }))
-      .filter((item) => !item.readAt)
-      .map((item) => item.id);
+  async function markAllRead(recipientId, ids = []) {
+    const targetIds = ids.length
+      ? ids
+      : (await listNotifications({ recipientId }))
+          .filter((item) => !item.readAt)
+          .map((item) => item.id)
+          .filter(Boolean)
 
-    return Promise.all(targetIds.map((id) => markRead(id)));
+    return Promise.all(targetIds.map((id) => markRead(id)))
   }
 
   async function archiveNotification(notificationId) {
-    return actions.notifications.update(notificationId, {
-      archivedAt: new Date().toISOString(),
+    const notifications = requireActions('notifications')
+    return notifications.update(notificationId, {
+      archivedAt: now().toISOString(),
       status: 'archived',
-      updatedAt: new Date().toISOString(),
-    });
+      updatedAt: now().toISOString(),
+    })
   }
 
   return {
@@ -162,8 +165,7 @@ export function createNotificationRepository(options = {}) {
     markAllRead,
     archiveNotification,
     actions,
-    states,
-  };
+  }
 }
 
-export default createNotificationRepository;
+export default createNotificationRepository

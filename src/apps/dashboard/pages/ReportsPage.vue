@@ -1,8 +1,8 @@
 <template>
   <DashboardPageShell
     eyebrow="Reporting"
-    title="Reports"
-    description="Starter report summaries that can be extended into exports, scheduled reports, or department-specific dashboards."
+    title="Operational Reports"
+    description="Role-safe reporting for EduProLIC management and editorial workflows."
   >
     <div class="kpi-grid xl:grid-cols-3">
       <DashboardStatCard
@@ -14,61 +14,63 @@
       />
     </div>
 
-    <DashboardWidgetCard title="Report Notes" description="These starter notes make the app useful immediately while staying easy to replace later.">
+    <DashboardWidgetCard title="Report Notes" description="Only the roles that should see reports can access this page.">
       <ul class="space-y-3 text-sm leading-6 text-soft">
-        <li class="list-row items-start bg-surface-2">Use this page as the handoff point for CSV, PDF, or email report generation later.</li>
-        <li class="list-row items-start bg-surface-2">Metrics are already derived from the root store and generated collection actions.</li>
-        <li class="list-row items-start bg-surface-2">Once project-specific reporting rules are ready, replace these starter cards with targeted report blocks.</li>
+        <li class="list-row items-start bg-surface-2">Admin and receptionist share the same operational visibility.</li>
+        <li class="list-row items-start bg-surface-2">Consultants do not get reports because they should only see their own work dashboard.</li>
+        <li class="list-row items-start bg-surface-2">Consultant-editors can review editorial workload without opening full finance control screens.</li>
+        <li class="list-row items-start bg-surface-2">Sysadmin gets system-level visibility in addition to management reporting.</li>
       </ul>
     </DashboardWidgetCard>
   </DashboardPageShell>
 </template>
 
 <script setup>
-/**
- * @file apps/dashboard/pages/ReportsPage.vue
- * @description Report starter page for the dashboard app.
- */
+import { computed, onMounted, ref } from 'vue'
+import DashboardPageShell from '../components/DashboardPageShell.vue'
+import DashboardStatCard from '../components/DashboardStatCard.vue'
+import DashboardWidgetCard from '../components/DashboardWidgetCard.vue'
+import { useDashboardService } from '../services/dashboardService.js'
 
-import { computed, onMounted, ref } from 'vue';
-import DashboardPageShell from '../components/DashboardPageShell.vue';
-import DashboardStatCard from '../components/DashboardStatCard.vue';
-import DashboardWidgetCard from '../components/DashboardWidgetCard.vue';
-import { useDashboardService } from '../services/dashboardService.js';
-
-const dashboardService = useDashboardService();
-const metrics = ref({ raw: {} });
+const dashboardService = useDashboardService()
+const metrics = ref({ raw: {} })
 
 const reportCards = computed(() => {
-  const raw = metrics.value.raw || {};
+  const raw = metrics.value.raw || {}
 
   return [
     {
-      id: 'users',
-      label: 'Users in Scope',
-      value: raw.totalUsers?.toLocaleString?.() || raw.totalUsers || 0,
-      description: 'Useful for adoption and account growth summaries.',
+      id: 'role',
+      label: 'Role Context',
+      value: String(raw.role || 'unknown').replace(/_/g, ' '),
+      description: 'Current role scope used to build this report page.',
     },
     {
-      id: 'orders',
-      label: 'Orders in Scope',
-      value: raw.totalOrders?.toLocaleString?.() || raw.totalOrders || 0,
-      description: 'Starter order volume summary for reporting extensions.',
+      id: 'engagements',
+      label: 'Work Records In Scope',
+      value: raw.engagements?.toLocaleString?.() || raw.engagements || 0,
+      description: 'Work items currently visible to this reporting role.',
     },
     {
-      id: 'revenue',
-      label: 'Revenue Snapshot',
-      value: new Intl.NumberFormat('en-NA', { style: 'currency', currency: 'NAD', maximumFractionDigits: 0 }).format(raw.revenue || 0),
-      description: 'Derived from orders or closed opportunities when available.',
+      id: 'clients',
+      label: 'Clients In Scope',
+      value: raw.clients?.toLocaleString?.() || raw.clients || 0,
+      description: 'Client profiles currently visible through the dashboard service.',
     },
-  ];
-});
+    {
+      id: 'notifications',
+      label: 'Notifications In Scope',
+      value: raw.notifications?.toLocaleString?.() || raw.notifications || 0,
+      description: 'Notifications available to the current role context.',
+    },
+  ]
+})
 
 onMounted(() => {
   dashboardService.getOverviewMetrics()
     .then((value) => {
-      metrics.value = value;
+      metrics.value = value
     })
-    .catch(console.error);
-});
+    .catch(console.error)
+})
 </script>

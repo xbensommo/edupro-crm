@@ -745,33 +745,71 @@ function buildAssignmentRulePayload(payload = {}, context) {
  * @returns {Record<string, any>}
  */
 function buildEngagemnetPayload(payload = {}, context) {
+  const netAmount = asMoney(payload.netAmountCached ?? payload.netAmount)
+  const consultantShareAmountCached = asMoney(payload.consultantShareCached ?? payload.consultantShareAmountCached)
+  const companyShareAmountCached = asMoney(payload.companyShareCached ?? payload.companyShareAmountCached)
+  const reviewDeductionPercent = asNumber(payload.reviewDeductionPercent)
+  const reviewDeductionAmount = asMoney(consultantShareAmountCached * (reviewDeductionPercent / 100))
+  const finalPayoutAmountCached = Math.max(consultantShareAmountCached - reviewDeductionAmount, 0)
+
   return {
     engagementCode: asText(payload.engagementCode) || createEngagementCode(),
     clientId: asText(payload.clientId),
+    clientName: asText(payload.clientName),
+    clientEmail: asText(payload.clientEmail),
+    clientPhone: asText(payload.clientPhone),
     title: asText(payload.title),
     serviceType: asText(payload.serviceType),
     description: asText(payload.description) || null,
     studyLevel: asText(payload.studyLevel) || null,
     institutionName: asText(payload.institutionName) || null,
     assignedConsultantId: asText(payload.assignedConsultantId) || null,
+    consultantName: asText(payload.assignedConsultantInfo || payload.consultantName) || null,
+    assignedConsultantInfo: asText(payload.assignedConsultantInfo || payload.consultantName) || null,
+    assignedEditorId: asText(payload.assignedEditorId) || null,
+    assignedEditorName: asText(payload.assignedEditorName) || null,
     assignedTeam: asText(payload.assignedTeam) || null,
     priority: asText(payload.priority) || 'medium',
-    status: asText(payload.status) || 'draft',
+    status: asText(payload.status) || 'active',
     deliveryStatus: asText(payload.deliveryStatus) || 'pending',
     satisfactionStatus: asText(payload.satisfactionStatus) || 'pending',
+    reviewStatus: asText(payload.reviewStatus) || 'pending',
+    reviewRespondedAt: asText(payload.reviewRespondedAt),
+    reviewRespondedBy: asText(payload.reviewRespondedBy),
+    reviewRespondedByName: asText(payload.reviewRespondedByName),
+    reviewRemarks: asText(payload.reviewRemarks) || null,
+    reviewDeductionPercent,
+
     quotedAmount: asMoney(payload.quotedAmount),
-    discountAmount: asMoney(payload.discountAmountValue),
-    netAmount: asMoney(payload.netAmount),
+    discountAmount: asMoney(payload.discountAmount),
+    netAmount,
+
+    files: Array.isArray(payload.files) ? payload.files : [],
+    fileUrls: Array.isArray(payload.fileUrls) ? payload.fileUrls : [],
+    finalFiles: Array.isArray(payload.finalFiles) ? payload.finalFiles : [],
+    finalFileUrls: Array.isArray(payload.finalFileUrls) ? payload.finalFileUrls : [],
+    finalUpdates: Array.isArray(payload.finalUpdates) ? payload.finalUpdates : [],
+
+    assignmentRespondedAt: asText(payload.assignmentRespondedAt),
+    assignmentRespondedBy: asText(payload?.assignmentRespondedBy),
+    assignmentRespondedByName: asText(payload.assignmentRespondedByName),
+    assignmentStatus: asText(payload.assignmentStatus) || (payload.assignedConsultantId ? 'pending' : 'unassigned'),
+
     currency: asText(payload.currency) || 'NAD',
-    shareRuleId: asText(payload.shareRuleId) || null,
-    amountPaidCached: asMoney(payload.amountPaidValue),
-    amountRefundedCached: asMoney(payload.amountRefundedValue),
-    amountDueCached: asMoney(payload.amountDue),
-    consultantShareAmountCached: asMoney(payload.consultantShare),
-    companyShareAmountCached: asMoney(payload.companyShare),
+    amountPaidCached: asMoney(payload.amountPaidCached),
+    amountRefundedCached: asMoney(payload.amountRefundedCached),
+    amountDueCached: asMoney(payload.amountDueCached),
+    consultantShareAmountCached,
+    companyShareAmountCached,
+    finalPayoutAmountCached,
+    financeFeedStatus: asText(payload.financeFeedStatus) || 'pending',
+    financeLastSyncedAt: normalizeDate(payload.financeLastSyncedAt),
+    notificationFeedStatus: asText(payload.notificationFeedStatus) || 'pending',
+
     startDate: normalizeDate(payload.startDate),
     dueDate: normalizeDate(payload.dueDate),
     remarks: asText(payload.remarks) || null,
+
     createdBy: payload.currentUserId || context.getCurrentUserId() || null,
     createdAt: context.getNow(),
     updatedAt: context.getNow(),
@@ -784,7 +822,9 @@ function buildEngagemnetPayload(payload = {}, context) {
  * @param {ReturnType<typeof useAppStore>} [store]
  * @returns {object}
  */
-export function createCrmService(store = useAppStore()) {
+export function createCrmService() {
+  const store = useAppStore();
+
   const context = createServiceContext({
     store,
     domain: 'crm',
@@ -817,6 +857,165 @@ export function createCrmService(store = useAppStore()) {
       code: 'crm/forbidden',
     })
   }
+
+  function getCollectionActions(name) {
+    return store.getCollectionActions?.(name) || store[`${name}Actions`] || null
+  }
+
+  async function safeAdd(name, payload) {
+    const actions = getCollectionActions(name)
+    if (actions?.add) {
+      return await actions.add(payload)
+    }
+    return null
+  }
+
+  async function safeListUsersByRole(role) {
+    const users = Array.isArray(store?.users?.items) ? store.users.items : []
+    return users
+      .map((entry) => entry?.data ? { id: entry.id || entry.docId || entry._id, ...entry.data } : entry)
+      .filter((user) => user?.role === role || (Array.isArray(user?.roles) && user.roles.includes(role)))
+  }
+
+  async function createInAppNotifications(payloads = []) {
+    const notifications = []
+    for (const payload of payloads.filter(Boolean)) {
+      const created = await store.notificationsActions.add({
+        user_id: payload.user_id ,
+        title: payload.title,
+        message: payload.message,
+        event: payload.event,
+        type: payload.type || 'crm',
+        channel: 'in_app',
+        status: 'queued',
+        priority: payload.priority || 'normal',
+        actionUrl: payload.actionUrl || null,
+        entityType: payload.entityType || 'engagement',
+        entityId: payload.entityId || null,
+        actorId: context.getCurrentUserId() || null,
+        actorName: payload.actorName || 'System',
+        meta: payload.meta || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      if (created) notifications.push(created)
+    }
+    return notifications
+  }
+
+  async function notifyRoles(roles, buildPayload) {
+    const recipients = []
+    for (const role of roles) {
+      const users = await safeListUsersByRole(role)
+      recipients.push(...users)
+    }
+    const deduped = new Map()
+    for (const user of recipients) {
+      const id = user?.id || user?.uid
+      if (!id) continue
+      deduped.set(id, user)
+    }
+    return await createInAppNotifications(
+      [...deduped.values()].map((user) => buildPayload(user)).filter(Boolean),
+    )
+  }
+
+  async function notifyWorkAssignment(engagement) {
+    const recipientId = engagement?.assignedConsultantId || null
+    if (!recipientId) return []
+    return await createInAppNotifications([
+      {
+        user_id: recipientId,
+        title: 'New work assigned',
+        message: `${engagement.title || 'Work'} has been assigned to you. Accept or deny the assignment.`,
+        event: 'work.assigned',
+        priority: 'high',
+        actionUrl: `/crm/work/v/${engagement.id || ''}`,
+        entityId: engagement.id || null,
+        meta: { domain: 'crm', sourceModule: 'crm', roleScope: ['consultant'] },
+      },
+      engagement.assignedEditorId
+        ? {
+            user_id: engagement.assignedEditorId,
+            title: 'Work queued for review',
+            message: `${engagement.title || 'Work'} has an assigned consultant and will need editorial review.`,
+            event: 'work.review.assigned',
+            priority: 'normal',
+            actionUrl: `/crm/work/v/${engagement.id || ''}`,
+            entityId: engagement.id || null,
+            meta: { domain: 'crm', sourceModule: 'crm', roleScope: ['consultant_editor'] },
+          }
+        : null,
+    ])
+  }
+
+  async function notifyAssignmentDecision(engagement, decision) {
+    const roles = ['admin', 'receptionist']
+    return await notifyRoles(roles, (user) => ({
+      user_id: user.id || user.uid,
+      title: decision === 'accepted' ? 'Assignment accepted' : 'Assignment denied',
+      message: `${engagement.consultantName || 'Consultant'} ${decision} work ${engagement.engagementCode || engagement.id || ''}.`,
+      event: decision === 'accepted' ? 'work.assignment.accepted' : 'work.assignment.denied',
+      priority: decision === 'accepted' ? 'normal' : 'high',
+      actionUrl: `/crm/work/v/${engagement.id || ''}`,
+      entityId: engagement.id || null,
+      meta: { domain: 'crm', sourceModule: 'crm', roleScope: roles },
+    }))
+  }
+
+  async function notifyFinalSubmission(engagement) {
+    return await notifyRoles(['admin', 'receptionist', 'consultant_editor'], (user) => ({
+      user_id: user.id || user.uid,
+      title: 'Final delivery submitted',
+      message: `${engagement.consultantName || 'Consultant'} submitted final work for ${engagement.title || engagement.engagementCode || 'an assignment'}.`,
+      event: 'work.final.submitted',
+      priority: 'high',
+      actionUrl: `/crm/work/v/${engagement.id || ''}`,
+      entityId: engagement.id || null,
+      meta: { domain: 'crm', sourceModule: 'crm', roleScope: ['admin', 'receptionist', 'consultant_editor'] },
+    }))
+  }
+
+  async function feedFinanceFromEngagement(engagement, mode = 'create') {
+    const createdAt = new Date().toISOString()
+    await safeAdd('finance_transactions', {
+      type: 'adjustment',
+      status: 'draft',
+      reference: engagement.engagementCode || engagement.id || '',
+      memo: `CRM ${mode}: ${engagement.title || 'Work item'}`,
+      occurredOn: createdAt,
+      amount: asMoney(engagement.netAmount || engagement.netAmountCached),
+      currency: engagement.currency || 'NAD',
+      clientId: engagement.clientId || null,
+      clientLabel: engagement.clientName || '',
+      consultantId: engagement.assignedConsultantId || null,
+      consultantLabel: engagement.consultantName || '',
+      sourceRef: `crm:engagement:${engagement.id || engagement.engagementCode || ''}`,
+      createdBy: context.getCurrentUserId() || null,
+      createdAt,
+      updatedAt: createdAt,
+    })
+
+    await safeAdd('consultant_payouts', {
+      payoutCode: `PAYOUT-${engagement.engagementCode || createSequence('PAYOUT')}`,
+      consultantId: engagement.assignedConsultantId || 'unassigned',
+      clientId: engagement.clientId,
+      engagementId: engagement.id || null,
+      grossServiceAmount: asMoney(engagement.netAmount || engagement.netAmountCached),
+      consultantShareAmount: asMoney(engagement.consultantShareAmountCached),
+      companyShareAmount: asMoney(engagement.companyShareAmountCached),
+      paidAmount: 0,
+      balanceAmount: asMoney(engagement.finalPayoutAmountCached ?? engagement.consultantShareAmountCached),
+      payoutDate: createdAt,
+      status: 'pending',
+      paymentMethod: null,
+      referenceNumber: engagement.engagementCode || '',
+      notes: `Auto-created from CRM ${mode}.`,
+      createdAt,
+      updatedAt: createdAt,
+    })
+  }
+
 
   /**
    * @param {string} collectionName
@@ -1279,32 +1478,32 @@ export function createCrmService(store = useAppStore()) {
 
   async function fetchDashboardSnapshot() {
     try {
-      const [leads, contacts, accounts, opportunities, tasks, activities] = await Promise.all([
-        fetchLeads(),
-        fetchContacts(),
-        fetchAccounts(),
-        fetchOpportunities(),
-        fetchTasks(),
+      const [engagements, activities, clients] = await Promise.all([
+        fetchRecentEngagements(),
         fetchActivities(),
+        fetchClients(),
       ])
 
-      const openPipelineAmount = opportunities
-        .filter((item) => !['closed_won', 'closed_lost'].includes(item?.stage))
-        .reduce((total, item) => total + Number(item?.weightedAmount || item?.amount || 0), 0)
+      const totals = engagements.reduce((acc, item) => {
+        acc.totalWork += 1
+        acc.totalValue += asMoney(item?.netAmount)
+        acc.amountPaid += asMoney(item?.amountPaidCached)
+        acc.amountDue += asMoney(item?.amountDueCached)
+        if (String(item?.assignmentStatus || '').toLowerCase() === 'accepted') acc.accepted += 1
+        if (String(item?.deliveryStatus || '').toLowerCase() === 'submitted') acc.awaitingReview += 1
+        if (String(item?.deliveryStatus || '').toLowerCase() === 'delivered') acc.delivered += 1
+        if (String(item?.reviewStatus || '').toLowerCase() === 'changes_requested') acc.revisionQueue += 1
+        return acc
+      }, { totalWork: 0, totalValue: 0, amountPaid: 0, amountDue: 0, accepted: 0, awaitingReview: 0, delivered: 0, revisionQueue: 0 })
 
       return {
         totals: {
-          leads: leads.length,
-          contacts: contacts.length,
-          accounts: accounts.length,
-          opportunities: opportunities.length,
-          tasks: tasks.length,
+          clients: clients.length,
           activities: activities.length,
-          openPipelineAmount,
+          ...totals,
         },
-        recentLeads: [...leads].sort((a, b) => toSortableDate(b?.createdAt) - toSortableDate(a?.createdAt)).slice(0, 5),
+        recentWork: [...engagements].sort((a, b) => toSortableDate(b?.createdAt) - toSortableDate(a?.createdAt)).slice(0, 8),
         recentActivities: [...activities].sort((a, b) => toSortableDate(b?.createdAt) - toSortableDate(a?.createdAt)).slice(0, 8),
-        opportunitiesByStage: CRM_PIPELINE_STAGES.map((stage) => ({ stage, items: opportunities.filter((item) => item?.stage === stage) })),
       }
     } catch (error) { throw normalizeCrmError(error, 'Failed to load the CRM dashboard snapshot.', context) }
   }
@@ -1362,7 +1561,7 @@ export function createCrmService(store = useAppStore()) {
     } catch (error) { throw normalizeCrmError(error, 'Failed to load the CRM reports snapshot.', context) }
   }
 
-  async function fetchClients(params = { pageSize: 100, sortBy: 'updatedAt', sortDirection: 'desc' }) {
+  async function fetchClients(params = { pageSize: 200, sortBy: 'createAt', sortDirection: 'desc' }) {
     try { return await fetchCollection(CRM_COLLECTIONS.clients, params) } catch (error) { throw normalizeCrmError(error, 'Failed to load clients.', context) }
   }
   async function fetchRecentEngagements(params = {}) {
@@ -1370,18 +1569,24 @@ export function createCrmService(store = useAppStore()) {
   }
   async function createEngagements(payload) {
     assertWrite('crm:write')
+
     try {
       return await withActivityLog(
-        () => add(CRM_COLLECTIONS.engagements, buildEngagemnetPayload(payload, context)),
+        async () => {
+          const engagement = await add(CRM_COLLECTIONS.engagements, buildEngagemnetPayload(payload, context))
+          const normalized = { ...(engagement || {}), ...(engagement?.data || {}), id: engagement?.id || engagement?.docId || engagement?._id || null }
+          await feedFinanceFromEngagement(normalized, 'create')
+          await notifyWorkAssignment(normalized)
+          return engagement
+        },
         {
           log: async (engagement) => {
             await createActivity({
               contactId: engagement?.id || null,
-              accountId: payload?.accountId || null,
               leadId: payload?.clientId || null,
               type: 'engagement_created',
-              subject: 'Engagement created',
-              description: `New engagement ${payload?.title || ''} was added.`.trim(),
+              subject: 'Work created',
+              description: `New work ${payload?.title || ''} was added for ${payload?.clientName || 'the client'}.`.trim(),
             })
           },
         },
@@ -1390,6 +1595,19 @@ export function createCrmService(store = useAppStore()) {
   }
   async function fetchRecentFiles(params = {}) {
     try { return await fetchCollection(CRM_COLLECTIONS.crmFiles, params) } catch (error) { throw normalizeCrmError(error, 'Failed to load recent files.', context) }
+  }
+
+
+  async function syncAssignmentDecisionNotification(engagement, decision) {
+    return await notifyAssignmentDecision(engagement, decision)
+  }
+
+  async function syncFinalSubmissionNotifications(engagement) {
+    return await notifyFinalSubmission(engagement)
+  }
+
+  async function syncEngagementToFinance(engagement, mode = 'update') {
+    return await feedFinanceFromEngagement(engagement, mode)
   }
 
   return {
@@ -1436,10 +1654,12 @@ export function createCrmService(store = useAppStore()) {
     searchEverything,
     fetchDashboardSnapshot,
     fetchReportsSnapshot,
+    syncAssignmentDecisionNotification,
+    syncFinalSubmissionNotifications,
+    syncEngagementToFinance,
     createEngagementCode,
     clientPrimaryLabel,
     money,
-    asMoney,
     asMoney,
     clientSecondaryLabel,
     formatDate,

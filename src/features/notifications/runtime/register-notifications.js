@@ -33,7 +33,11 @@ import { registerNotificationHooks } from './notification-hooks.js';
  */
 export function registerNotificationsFeature(options = {}) {
   const eventBus = options.eventBus || createDomainEventBus();
-  const repository = createNotificationRepository({ provider: options.shardProvider });
+  //const repository = createNotificationRepository();
+  const recipientField = 'user_id'
+
+  const repository = createNotificationRepository({ recipientField })
+
   const templateService = createNotificationTemplateService();
   const recipientsService = createNotificationRecipientsService({
     currentUser: options.currentUser,

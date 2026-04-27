@@ -1,32 +1,11 @@
 /**
  * @file apps/dashboard/services/dashboardService.js
- * @description Generic dashboard service for the latest Totistack root-store architecture.
- *
- * Design rules:
- * - The root store owns auth and RBAC.
- * - This module does not create a provider or mutate the router.
- * - Metrics are derived from available collections and root-store state where possible.
- * - The service stays generic so it can be reused as a starter dashboard across projects.
+ * @description EduProLIC dashboard service with strict role-scoped widgets and metrics.
  */
 
-import { computed } from 'vue';
-import { useAppStore } from '@app/stores/appStore/index.js';
+import { computed } from 'vue'
+import { useAppStore } from '@app/stores/appStore/index.js'
 
-/**
- * Common collection hints used to derive dashboard metrics when those collections exist.
- */
-export const DASHBOARD_COLLECTION_HINTS = Object.freeze({
-  users: ['users'],
-  orders: ['orders', 'sales_orders'],
-  bookings: ['bookings', 'appointments'],
-  opportunities: ['crm_opportunities'],
-  notifications: ['notifications'],
-  activity: ['crm_activities', 'audit_logs', 'activity_logs'],
-});
-
-/**
- * Default widget identifiers shipped by the starter dashboard app.
- */
 export const DASHBOARD_WIDGETS = Object.freeze([
   'metrics',
   'recent-activity',
@@ -34,345 +13,386 @@ export const DASHBOARD_WIDGETS = Object.freeze([
   'notifications',
   'quick-actions',
   'system-status',
-]);
+])
 
-/**
- * Normalize a date-like value into a Date.
- *
- * @param {unknown} value
- * @returns {Date|null}
- */
 function normalizeDate(value) {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value?.toDate === 'function') return value.toDate();
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (!value) return null
+  if (value instanceof Date) return value
+  if (typeof value?.toDate === 'function') return value.toDate()
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-/**
- * Pick the first collection name that exists on the root store state.
- *
- * @param {ReturnType<typeof useAppStore>} store
- * @param {string[]} candidates
- * @returns {string|null}
- */
-function pickCollectionName(store, candidates = []) {
-  return candidates.find((collectionName) => Boolean(store?.[collectionName])) || null;
+function getRecordId(record) {
+  return record?.id || record?.docId || record?._id || ''
 }
 
-/**
- * Read collection items safely from the root store.
- *
- * @param {ReturnType<typeof useAppStore>} store
- * @param {string|null} collectionName
- * @returns {Record<string, any>[]}
- */
-function getCollectionItems(store, collectionName) {
-  if (!collectionName || !store?.[collectionName]?.value) {
-    return [];
-  }
+function getCollectionItems(store, name) {
+  const direct = store?.[name]?.items
+  if (Array.isArray(direct)) return direct
 
-  const bucket = store[collectionName].value;
-  return Array.isArray(bucket?.items) ? bucket.items : [];
+  const actionsState = store?.[`${name}Actions`]?.state?.items
+  if (Array.isArray(actionsState)) return actionsState
+
+  const collectionState = store?.collections?.[name]?.items
+  if (Array.isArray(collectionState)) return collectionState
+
+  const directValue = store?.[name]?.value?.items
+  if (Array.isArray(directValue)) return directValue
+
+  return []
 }
 
-/**
- * Try to load an initial page for a generated collection when its state is empty.
- *
- * @param {ReturnType<typeof useAppStore>} store
- * @param {string|null} collectionName
- * @returns {Promise<void>}
- */
-async function ensureCollectionLoaded(store, collectionName) {
-  if (!collectionName) return;
-
-  const items = getCollectionItems(store, collectionName);
-  if (items.length > 0) return;
-
-  const actions = store.getCollectionActions?.(collectionName) || store?.[`${collectionName}Actions`];
-  if (actions?.fetchInitialPage) {
-    await actions.fetchInitialPage();
-  }
+function recordData(record) {
+  if (!record || typeof record !== 'object') return {}
+  return record.data && typeof record.data === 'object' ? record.data : record
 }
 
-/**
- * Sum numeric field values from a collection.
- *
- * @param {Record<string, any>[]} items
- * @param {string[]} fieldNames
- * @returns {number}
- */
-function sumFieldValues(items = [], fieldNames = []) {
-  return items.reduce((total, item) => {
-    const fieldName = fieldNames.find((name) => Number.isFinite(Number(item?.[name])));
-    return total + (fieldName ? Number(item[fieldName]) : 0);
-  }, 0);
+function asNumber(value) {
+  const numeric = Number(value || 0)
+  return Number.isFinite(numeric) ? numeric : 0
 }
 
-/**
- * Format a compact status label.
- *
- * @param {string} value
- * @returns {string}
- */
-function toTitleCase(value = '') {
+function toCurrency(value) {
+  return new Intl.NumberFormat('en-NA', {
+    style: 'currency',
+    currency: 'NAD',
+    maximumFractionDigits: 0,
+  }).format(asNumber(value))
+}
+
+function sumBy(items, mapper) {
+  return items.reduce((total, item) => total + asNumber(mapper(item)), 0)
+}
+
+function formatRole(value = '') {
   return String(value)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+    .replace(/_/g, ' ')
+    .replace(/\w/g, (char) => char.toUpperCase())
 }
 
-/**
- * Group items by day over the supplied period.
- *
- * @param {Record<string, any>[]} items
- * @param {number} periodDays
- * @returns {{ labels: string[], values: number[] }}
- */
-function buildDailySeries(items = [], periodDays = 30) {
-  const labels = [];
-  const values = [];
-  const now = new Date();
-  const buckets = new Map();
+function buildDailySeries(items = [], periodDays = 30, dateGetter) {
+  const labels = []
+  const values = []
+  const now = new Date()
+  const buckets = new Map()
 
   for (let index = periodDays - 1; index >= 0; index -= 1) {
-    const date = new Date(now);
-    date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() - index);
-    const key = date.toISOString().slice(0, 10);
-    labels.push(key);
-    buckets.set(key, 0);
+    const date = new Date(now)
+    date.setHours(0, 0, 0, 0)
+    date.setDate(date.getDate() - index)
+    const key = date.toISOString().slice(0, 10)
+    labels.push(key)
+    buckets.set(key, 0)
   }
 
   items.forEach((item) => {
-    const rawDate = item?.createdAt || item?.timestamp || item?.lastActivityAt || item?.updatedAt;
-    const date = normalizeDate(rawDate);
-    if (!date) return;
-
-    const key = new Date(date).toISOString().slice(0, 10);
+    const date = normalizeDate(dateGetter(item))
+    if (!date) return
+    const key = new Date(date).toISOString().slice(0, 10)
     if (buckets.has(key)) {
-      buckets.set(key, (buckets.get(key) || 0) + 1);
+      buckets.set(key, (buckets.get(key) || 0) + 1)
     }
-  });
+  })
 
-  labels.forEach((label) => values.push(buckets.get(label) || 0));
-  return { labels, values };
+  labels.forEach((label) => values.push(buckets.get(label) || 0))
+  return { labels, values }
 }
 
-/**
- * Build stable dashboard quick actions.
- *
- * @returns {Array<Record<string, string>>}
- */
-function buildQuickActions() {
-  return [
-    { id: 'dashboard-home', label: 'Open Dashboard', to: '/dashboard', description: 'Return to the main dashboard overview.' },
-    { id: 'dashboard-analytics', label: 'View Analytics', to: '/dashboard/analytics', description: 'Open metrics and trend summaries.' },
-    { id: 'dashboard-reports', label: 'Open Reports', to: '/dashboard/reports', description: 'Review export-ready operational reports.' },
-    { id: 'crm-leads', label: 'CRM Leads', to: '/crm/leads', description: 'Jump directly into lead management.' },
-  ];
-}
-
-/**
- * Create the dashboard service bound to the root store.
- *
- * @param {ReturnType<typeof useAppStore>} [store]
- * @returns {object}
- */
 export function createDashboardService(store = useAppStore()) {
-  const userCollection = pickCollectionName(store, DASHBOARD_COLLECTION_HINTS.users);
-  const orderCollection = pickCollectionName(store, DASHBOARD_COLLECTION_HINTS.orders);
-  const bookingCollection = pickCollectionName(store, DASHBOARD_COLLECTION_HINTS.bookings);
-  const opportunityCollection = pickCollectionName(store, DASHBOARD_COLLECTION_HINTS.opportunities);
-  const notificationCollection = pickCollectionName(store, DASHBOARD_COLLECTION_HINTS.notifications);
-  const activityCollection = pickCollectionName(store, DASHBOARD_COLLECTION_HINTS.activity);
+  const currentUser = computed(() => store.currentUser?.value || store.currentUser || null)
 
-  /**
-   * Check read access when RBAC is enabled.
-   *
-   * @param {string} permission
-   * @returns {void}
-   */
+  function hasRole(role) {
+    return typeof store.hasRole === 'function' ? store.hasRole(role) : currentUser.value?.role === role
+  }
+
+  function hasPermission(permission) {
+    return typeof store.hasPermission === 'function' ? store.hasPermission(permission) : true
+  }
+
   function assertPermission(permission) {
-    if (store.rbacEnabled?.value && typeof store.hasPermission === 'function' && !store.hasPermission(permission)) {
-      const error = new Error(`Missing permission: ${permission}`);
-      error.code = 'dashboard/forbidden';
-      throw error;
+    if (!hasPermission(permission)) {
+      const error = new Error(`Missing permission: ${permission}`)
+      error.code = 'dashboard/forbidden'
+      throw error
     }
   }
 
-  /**
-   * Prime dashboard-related collection state.
-   *
-   * @returns {Promise<void>}
-   */
-  async function warmup() {
-    await Promise.all([
-      ensureCollectionLoaded(store, userCollection),
-      ensureCollectionLoaded(store, orderCollection),
-      ensureCollectionLoaded(store, bookingCollection),
-      ensureCollectionLoaded(store, opportunityCollection),
-      ensureCollectionLoaded(store, notificationCollection),
-      ensureCollectionLoaded(store, activityCollection),
-    ]);
+  function getRoleContext() {
+    if (hasRole('sysadmin')) return 'sysadmin'
+    if (hasRole('admin')) return 'admin'
+    if (hasRole('receptionist')) return 'receptionist'
+    if (hasRole('consultant_editor')) return 'consultant_editor'
+    return 'consultant'
   }
 
-  /**
-   * Derive overview metrics from the currently available collection state.
-   *
-   * @returns {Promise<Record<string, any>>}
-   */
-  async function getOverviewMetrics() {
-    assertPermission('dashboard:read');
-    await warmup();
-
-    const users = getCollectionItems(store, userCollection);
-    const orders = getCollectionItems(store, orderCollection);
-    const bookings = getCollectionItems(store, bookingCollection);
-    const opportunities = getCollectionItems(store, opportunityCollection);
-
-    const revenue = sumFieldValues(orders, ['total', 'totalAmount', 'amount'])
-      || sumFieldValues(opportunities.filter((item) => item?.stage === 'closed_won'), ['amount', 'weightedAmount']);
-
-    const metrics = {
-      totalUsers: users.length,
-      totalOrders: orders.length,
-      totalBookings: bookings.length,
-      revenue,
-      conversionRate: orders.length > 0 && users.length > 0
-        ? Math.round((orders.length / users.length) * 100)
-        : 0,
-      activeSessions: store.currentUser?.value ? 1 : 0,
-      updatedAt: new Date(),
-    };
+  function getDataSets() {
+    const engagements = getCollectionItems(store, 'engagements').map((item) => ({ id: getRecordId(item), ...recordData(item) }))
+    const clients = getCollectionItems(store, 'clients').map((item) => ({ id: getRecordId(item), ...recordData(item) }))
+    const notifications = getCollectionItems(store, 'notifications').map((item) => ({ id: getRecordId(item), ...recordData(item) }))
+    const financeTransactions = getCollectionItems(store, 'finance_transactions').map((item) => ({ id: getRecordId(item), ...recordData(item) }))
+    const consultantPayouts = getCollectionItems(store, 'consultant_payouts').map((item) => ({ id: getRecordId(item), ...recordData(item) }))
+    const users = getCollectionItems(store, 'users').map((item) => ({ id: getRecordId(item), ...recordData(item) }))
+    const currentUserId = currentUser.value?.uid || currentUser.value?.id || null
 
     return {
-      raw: metrics,
-      cards: [
-        { id: 'users', label: 'Users', value: metrics.totalUsers.toLocaleString(), description: 'Tracked users available in store state.' },
-        { id: 'orders', label: 'Orders', value: metrics.totalOrders.toLocaleString(), description: 'Orders loaded into the generated collection registry.' },
-        { id: 'bookings', label: 'Bookings', value: metrics.totalBookings.toLocaleString(), description: 'Bookings or appointments currently available.' },
-        { id: 'revenue', label: 'Revenue', value: new Intl.NumberFormat('en-NA', { style: 'currency', currency: 'NAD', maximumFractionDigits: 0 }).format(metrics.revenue), description: 'Derived from orders or closed opportunities.' },
-      ],
-    };
+      currentUserId,
+      engagements,
+      clients,
+      notifications,
+      financeTransactions,
+      consultantPayouts,
+      users,
+    }
   }
 
-  /**
-   * Build recent activity items.
-   *
-   * @param {{ limit?: number }} [options]
-   * @returns {Promise<Array<Record<string, any>>>}
-   */
-  async function getRecentActivity(options = {}) {
-    assertPermission('dashboard:read');
-    await ensureCollectionLoaded(store, activityCollection);
+  function scopeEngagementsByRole(allItems, role) {
+    const currentUserId = currentUser.value?.uid || currentUser.value?.id || null
+    if (!currentUserId) return []
+    if (role === 'consultant') {
+      return allItems.filter((item) => item.assignedConsultantId === currentUserId || item.assignmentRespondedBy === currentUserId)
+    }
+    if (role === 'consultant_editor') {
+      return allItems.filter((item) => item.assignedEditorId === currentUserId || item.reviewedBy === currentUserId)
+    }
+    return allItems
+  }
 
-    const items = getCollectionItems(store, activityCollection);
-    const limit = Number(options.limit || 8);
+  function buildMetricCards(role, data) {
+    const scopedEngagements = scopeEngagementsByRole(data.engagements, role)
+    const openEngagements = scopedEngagements.filter((item) => !['completed', 'cancelled'].includes(String(item.status || '').toLowerCase()))
+    const dueSoon = scopedEngagements.filter((item) => {
+      const due = normalizeDate(item.dueDate)
+      if (!due) return false
+      const diff = due.getTime() - Date.now()
+      return diff >= 0 && diff <= 1000 * 60 * 60 * 24 * 3
+    })
 
-    if (items.length > 0) {
-      return [...items]
-        .sort((a, b) => {
-          const aDate = normalizeDate(a?.createdAt || a?.timestamp || a?.updatedAt)?.getTime() || 0;
-          const bDate = normalizeDate(b?.createdAt || b?.timestamp || b?.updatedAt)?.getTime() || 0;
-          return bDate - aDate;
-        })
-        .slice(0, limit)
-        .map((item) => ({
-          id: item.id || item.uid || globalThis.crypto?.randomUUID?.() || `${Math.random()}`,
-          title: item.subject || item.title || item.type || 'Activity',
-          description: item.description || item.notes || 'Recent activity was recorded.',
-          type: item.type || item.category || 'activity',
-          timestamp: normalizeDate(item.createdAt || item.timestamp || item.updatedAt),
-        }));
+    if (role === 'consultant') {
+      const accepted = scopedEngagements.filter((item) => String(item.assignmentStatus || '').toLowerCase() === 'accepted')
+      const pending = scopedEngagements.filter((item) => String(item.assignmentStatus || 'pending').toLowerCase() === 'pending')
+      const submitted = scopedEngagements.filter((item) => String(item.deliveryStatus || '').toLowerCase() === 'submitted')
+      const reward = sumBy(scopedEngagements, (item) => item.consultantShareAmountCached || item.consultantShareCached)
+      return [
+        { id: 'consultant-open', label: 'My Active Work', value: openEngagements.length.toLocaleString(), description: 'Assignments currently on your desk.' },
+        { id: 'consultant-pending', label: 'Awaiting Response', value: pending.length.toLocaleString(), description: 'Assignments waiting for accept or deny.' },
+        { id: 'consultant-submitted', label: 'Submitted', value: submitted.length.toLocaleString(), description: 'Final deliveries already submitted.' },
+        { id: 'consultant-reward', label: 'Potential Commission', value: toCurrency(reward), description: 'Cached commission across your scoped work.' },
+      ]
     }
 
-    return Array.isArray(store.recentActivity?.value) ? store.recentActivity.value.slice(0, limit) : [];
+    if (role === 'consultant_editor') {
+      const awaitingReview = scopedEngagements.filter((item) => ['submitted', 'review_pending'].includes(String(item.reviewStatus || item.deliveryStatus || '').toLowerCase()))
+      const revisions = scopedEngagements.filter((item) => String(item.reviewStatus || '').toLowerCase() === 'revision_requested')
+      const approved = scopedEngagements.filter((item) => String(item.reviewStatus || '').toLowerCase() === 'approved')
+      return [
+        { id: 'editor-queue', label: 'Review Queue', value: awaitingReview.length.toLocaleString(), description: 'Submitted work waiting for editorial review.' },
+        { id: 'editor-revisions', label: 'Revisions Requested', value: revisions.length.toLocaleString(), description: 'Items sent back to consultants.' },
+        { id: 'editor-approved', label: 'Approved', value: approved.length.toLocaleString(), description: 'Reviewed work cleared for client delivery.' },
+        { id: 'editor-due', label: 'Due Soon', value: dueSoon.length.toLocaleString(), description: 'Work approaching deadline in your scope.' },
+      ]
+    }
+
+    if (role === 'sysadmin') {
+      return [
+        { id: 'sys-users', label: 'Active Users', value: data.users.length.toLocaleString(), description: 'Users loaded into the root registry.' },
+        { id: 'sys-notifications', label: 'Notifications', value: data.notifications.length.toLocaleString(), description: 'Current in-app notification records.' },
+        { id: 'sys-work', label: 'Total Work Records', value: data.engagements.length.toLocaleString(), description: 'Operational records available to the app.' },
+        { id: 'sys-clients', label: 'Client Records', value: data.clients.length.toLocaleString(), description: 'Loaded client profiles.' },
+      ]
+    }
+
+    const cashReceived = sumBy(data.financeTransactions.filter((item) => ['payment_received', 'client_payment'].includes(String(item.type || item.transactionType || '').toLowerCase())), (item) => item.amount || item.totalAmount)
+    const outstanding = sumBy(data.engagements, (item) => item.amountDueCached)
+    const unpaidCommission = sumBy(data.engagements, (item) => item.consultantShareAmountCached || item.consultantShareCached) - sumBy(data.consultantPayouts, (item) => item.amountPaid || item.totalPaid)
+
+    return [
+      { id: 'mgmt-clients', label: 'Clients', value: data.clients.length.toLocaleString(), description: 'Client records managed in the system.' },
+      { id: 'mgmt-open-work', label: 'Open Work', value: openEngagements.length.toLocaleString(), description: 'Active assignments not yet completed.' },
+      { id: 'mgmt-cash', label: 'Cash Received', value: toCurrency(cashReceived), description: 'Payments captured from finance transactions.' },
+      { id: 'mgmt-commission', label: 'Unpaid Commission', value: toCurrency(unpaidCommission), description: 'Estimated consultant commission still unpaid.' },
+      { id: 'mgmt-outstanding', label: 'Outstanding Due', value: toCurrency(outstanding), description: 'Open client balances from linked work.' },
+      { id: 'mgmt-due-soon', label: 'Due Soon', value: dueSoon.length.toLocaleString(), description: 'Assignments due within the next 3 days.' },
+    ]
   }
 
-  /**
-   * Build trend chart data from available store collections.
-   *
-   * @param {{ periodDays?: number }} [options]
-   * @returns {Promise<Record<string, any>>}
-   */
-  async function getChartData(options = {}) {
-    assertPermission('analytics:read');
-    await warmup();
+  function buildRecentActivity(role, data, limit = 8) {
+    const scopedEngagements = scopeEngagementsByRole(data.engagements, role)
+    const workEvents = scopedEngagements.map((item) => ({
+      id: `engagement-${item.id}`,
+      title: item.title || item.engagementCode || 'Work item',
+      description: `${formatRole(item.assignmentStatus || item.status || 'active')} · ${item.clientName || 'Client not set'}`,
+      type: item.serviceType || 'work',
+      timestamp: normalizeDate(item.updatedAt || item.finalSubmittedAt || item.createdAt || item.dueDate),
+    }))
 
-    const periodDays = Number(options.periodDays || 30);
-    const users = getCollectionItems(store, userCollection);
-    const orders = getCollectionItems(store, orderCollection);
-    const bookings = getCollectionItems(store, bookingCollection);
-
-    return {
-      users: buildDailySeries(users, periodDays),
-      orders: buildDailySeries(orders, periodDays),
-      bookings: buildDailySeries(bookings, periodDays),
-    };
-  }
-
-  /**
-   * Return dashboard notifications.
-   *
-   * @param {{ limit?: number }} [options]
-   * @returns {Promise<Array<Record<string, any>>>}
-   */
-  async function getNotifications(options = {}) {
-    assertPermission('dashboard:read');
-    await ensureCollectionLoaded(store, notificationCollection);
-
-    const items = getCollectionItems(store, notificationCollection);
-    const limit = Number(options.limit || 6);
-
-    if (items.length > 0) {
-      return items.slice(0, limit).map((item) => ({
-        id: item.id || item.uid || `${Math.random()}`,
+    const notificationEvents = data.notifications
+      .filter((item) => {
+        if (role === 'consultant') return (item.user_id  || item.recipientId) === data.currentUserId
+        if (role === 'consultant_editor') return (item.user_id  || item.recipientId) === data.currentUserId || String(item.roleScope || '').includes('consultant_editor')
+        return true
+      })
+      .map((item) => ({
+        id: `notification-${item.id}`,
         title: item.title || item.subject || 'Notification',
-        description: item.description || item.message || 'A new notification is available.',
-        level: item.level || item.type || 'info',
-      }));
+        description: item.message || item.description || 'Operational update.',
+        type: item.domain || 'notification',
+        timestamp: normalizeDate(item.createdAt || item.timestamp || item.updatedAt),
+      }))
+
+    return [...workEvents, ...notificationEvents]
+      .sort((a, b) => (b.timestamp?.getTime?.() || 0) - (a.timestamp?.getTime?.() || 0))
+      .slice(0, limit)
+  }
+
+  function buildChartData(role, data) {
+    const scopedEngagements = scopeEngagementsByRole(data.engagements, role)
+    const scopedNotifications = role === 'consultant' || role === 'consultant_editor'
+      ? data.notifications.filter((item) => (item.user_id  || item.recipientId) === data.currentUserId)
+      : data.notifications
+
+    const engagementDate = (item) => item.createdAt || item.updatedAt || item.dueDate
+    const submissionDate = (item) => item.finalSubmittedAt || item.updatedAt || item.createdAt
+    const notificationDate = (item) => item.createdAt || item.updatedAt
+
+    return {
+      assignments: buildDailySeries(scopedEngagements, 30, engagementDate),
+      submissions: buildDailySeries(scopedEngagements.filter((item) => item.finalSubmittedAt || String(item.deliveryStatus || '').toLowerCase() === 'submitted'), 30, submissionDate),
+      notifications: buildDailySeries(scopedNotifications, 30, notificationDate),
+    }
+  }
+
+  function buildNotifications(role, data, limit = 6) {
+    const items = data.notifications
+      .filter((item) => {
+        const recipientId = item.user_id  || item.recipientId || null
+        const roleScope = Array.isArray(item.roleScope) ? item.roleScope : [item.roleScope].filter(Boolean)
+        if (role === 'consultant' || role === 'consultant_editor') {
+          return recipientId === data.currentUserId || roleScope.includes(role)
+        }
+        if (role === 'sysadmin') return true
+        return recipientId == null || roleScope.length === 0 || roleScope.includes(role) || roleScope.includes('admin') || roleScope.includes('receptionist')
+      })
+      .sort((a, b) => (normalizeDate(b.createdAt || b.updatedAt)?.getTime() || 0) - (normalizeDate(a.createdAt || a.updatedAt)?.getTime() || 0))
+      .slice(0, limit)
+      .map((item) => ({
+        id: item.id,
+        title: item.title || item.subject || 'Notification',
+        description: item.message || item.description || 'Operational update.',
+        level: item.level || item.priority || 'info',
+      }))
+
+    return items
+  }
+
+  function buildQuickActions(role) {
+    if (role === 'consultant') {
+      return [
+        { id: 'my-work', label: 'My Work', to: '/crm/work', description: 'View assignments and respond to ownership requests.' },
+        { id: 'dashboard-analytics', label: 'My Analytics', to: '/dashboard/analytics', description: 'Track your work flow and submission volume.' },
+      ]
+    }
+
+    if (role === 'consultant_editor') {
+      return [
+        { id: 'review-queue', label: 'Review Queue', to: '/crm/work', description: 'Open work that needs editorial review.' },
+        { id: 'dashboard-reports', label: 'Review Reports', to: '/dashboard/reports', description: 'See editorial throughput and revision pressure.' },
+      ]
+    }
+
+    if (role === 'sysadmin') {
+      return [
+        { id: 'dashboard-home', label: 'Operations Dashboard', to: '/dashboard', description: 'Open the full role-scoped dashboard.' },
+        { id: 'dashboard-analytics', label: 'Analytics', to: '/dashboard/analytics', description: 'Inspect app-level metrics and trends.' },
+        { id: 'dashboard-reports', label: 'Reports', to: '/dashboard/reports', description: 'Review management and system summaries.' },
+      ]
     }
 
     return [
-      { id: 'starter-1', title: 'System ready', description: 'Dashboard starter widgets are active and waiting for project data.', level: 'success' },
-      { id: 'starter-2', title: 'Generated routes online', description: 'This dashboard now runs on the latest generated assembly flow.', level: 'info' },
-    ].slice(0, limit);
+      { id: 'clients', label: 'Client Records', to: '/clients', description: 'Manage client profiles and intake context.' },
+      { id: 'add-work', label: 'Add Work', to: '/crm/add-work', description: 'Create a new work item and assign it correctly.' },
+      { id: 'finance', label: 'Finance', to: '/finance', description: 'Open payments, balances, and commission visibility.' },
+      { id: 'dashboard-reports', label: 'Reports', to: '/dashboard/reports', description: 'Open management summaries and reporting.' },
+    ]
   }
 
-  /**
-   * Return status cards for the dashboard.
-   *
-   * @returns {Promise<Array<Record<string, any>>>}
-   */
+  function buildSystemStatus(role, data) {
+    const base = [
+      {
+        id: 'auth',
+        label: 'Authentication',
+        status: store.authInitialized?.value === false ? 'starting' : 'healthy',
+        detail: currentUser.value ? 'Authenticated session ready.' : 'Waiting for user session.',
+      },
+      {
+        id: 'rbac',
+        label: 'Access Control',
+        status: typeof store.hasRole === 'function' ? 'healthy' : 'warning',
+        detail: typeof store.hasRole === 'function' ? 'Role checks are available.' : 'Role helper not detected on root store.',
+      },
+      {
+        id: 'data',
+        label: 'Operational Data',
+        status: data.engagements.length || data.clients.length ? 'healthy' : 'warning',
+        detail: data.engagements.length || data.clients.length ? 'Dashboard is reading live module collections.' : 'No operational records are loaded yet.',
+      },
+    ]
+
+    if (role === 'sysadmin') {
+      base.push({
+        id: 'network',
+        label: 'Browser Network',
+        status: typeof navigator !== 'undefined' && navigator.onLine === false ? 'warning' : 'healthy',
+        detail: typeof navigator !== 'undefined' && navigator.onLine === false ? 'Browser reports offline mode.' : 'Browser reports online mode.',
+      })
+    }
+
+    return base
+  }
+
+  async function getOverviewMetrics() {
+    assertPermission('dashboard.overview.read')
+    const role = getRoleContext()
+    const data = getDataSets()
+    return {
+      raw: { role, engagements: data.engagements.length, clients: data.clients.length, notifications: data.notifications.length },
+      cards: buildMetricCards(role, data),
+    }
+  }
+
+  async function getRecentActivity(options = {}) {
+    assertPermission('dashboard.overview.read')
+    const role = getRoleContext()
+    return buildRecentActivity(role, getDataSets(), Number(options.limit || 8))
+  }
+
+  async function getChartData() {
+    assertPermission('dashboard.analytics.read')
+    const role = getRoleContext()
+    return buildChartData(role, getDataSets())
+  }
+
+  async function getNotifications(options = {}) {
+    assertPermission('dashboard.overview.read')
+    const role = getRoleContext()
+    return buildNotifications(role, getDataSets(), Number(options.limit || 6))
+  }
+
   async function getSystemStatus() {
-    assertPermission('dashboard:read');
-
-    return [
-      { id: 'auth', label: 'Authentication', status: store.authInitialized?.value ? 'healthy' : 'starting', detail: store.currentUser?.value ? 'Authenticated session ready.' : 'Waiting for user session.' },
-      { id: 'rbac', label: 'Access Control', status: store.rbacEnabled?.value === false ? 'disabled' : 'healthy', detail: store.rbacEnabled?.value === false ? 'Role and permission checks are disabled by config.' : 'Role and permission checks are enabled.' },
-      { id: 'network', label: 'Browser Network', status: typeof navigator !== 'undefined' && navigator.onLine === false ? 'warning' : 'healthy', detail: typeof navigator !== 'undefined' && navigator.onLine === false ? 'Browser reports offline mode.' : 'Browser reports online mode.' },
-      { id: 'data', label: 'Generated Collections', status: 'healthy', detail: 'Dashboard reads from the generated collection registry through the root store.' },
-    ];
+    const role = getRoleContext()
+    if (role === 'sysadmin') {
+      assertPermission('dashboard.system.read')
+    } else {
+      assertPermission('dashboard.overview.read')
+    }
+    return buildSystemStatus(role, getDataSets())
   }
 
-  /**
-   * Build default quick actions.
-   *
-   * @returns {Promise<Array<Record<string, string>>>}
-   */
   async function getQuickActions() {
-    assertPermission('dashboard:read');
-    return buildQuickActions();
+    assertPermission('dashboard.overview.read')
+    return buildQuickActions(getRoleContext())
   }
 
-  /**
-   * Build a full dashboard snapshot for page rendering.
-   *
-   * @returns {Promise<Record<string, any>>}
-   */
   async function getDashboardSnapshot() {
     const [metrics, recentActivity, charts, notifications, systemStatus, quickActions] = await Promise.all([
       getOverviewMetrics(),
@@ -381,7 +401,7 @@ export function createDashboardService(store = useAppStore()) {
       getNotifications(),
       getSystemStatus(),
       getQuickActions(),
-    ]);
+    ])
 
     return {
       metrics,
@@ -392,11 +412,11 @@ export function createDashboardService(store = useAppStore()) {
       quickActions,
       widgets: [...DASHBOARD_WIDGETS],
       generatedAt: new Date(),
-    };
+      role: getRoleContext(),
+    }
   }
 
   return {
-    warmup,
     getOverviewMetrics,
     getRecentActivity,
     getChartData,
@@ -404,21 +424,17 @@ export function createDashboardService(store = useAppStore()) {
     getSystemStatus,
     getQuickActions,
     getDashboardSnapshot,
-    currentUser: computed(() => store.currentUser?.value || null),
+    currentUser,
     isLoading: computed(() => Boolean(store.isLoading?.value)),
-  };
+    roleContext: computed(() => getRoleContext()),
+  }
 }
 
-/**
- * Convenience composable for setup scripts.
- *
- * @returns {ReturnType<typeof createDashboardService>}
- */
 export function useDashboardService() {
-  return createDashboardService();
+  return createDashboardService()
 }
 
 export default {
   createDashboardService,
   useDashboardService,
-};
+}

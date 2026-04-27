@@ -1,27 +1,37 @@
- /**
- * @file src/apps/finance/routes/index.js
- * @description Finance route contribution.
+/**
+ * @file src/apps/finance/routes.js
+ * @description EduProLIC finance route contribution.
  */
 
 const FinanceDashboardPage = () => import('./pages/FinanceDashboardPage.vue')
 const FinanceTransactionsPage = () => import('./pages/FinanceTransactionsPage.vue')
+const FinancePaymentsPage = () => import('./pages/FinancePaymentsPage.vue')
+const FinanceInvoicesPage = () => import('./pages/FinanceInvoicesPage.vue')
+const FinanceQuotationPage = () => import('./pages/FinanceQuotationPage.vue')
+const FinanceReceivablesPage = () => import('./pages/FinanceReceivablesPage.vue')
+const FinanceAuditPage = () => import('./pages/FinanceAuditPage.vue')
+const FinanceRefundsPage = () => import('./pages/FinanceRefundsPage.vue')
+const FinanceExpensesPage = () => import('./pages/FinanceExpensesPage.vue')
+const FinancePayoutsPage = () => import('./pages/FinancePayoutsPage.vue')
+const FinanceMyPayoutsPage = () => import('./pages/FinanceMyPayoutsPage.vue')
 const FinanceAccountsPage = () => import('./pages/FinanceAccountsPage.vue')
 const FinanceReportsPage = () => import('./pages/FinanceReportsPage.vue')
 const FinanceBalanceSheetPage = () => import('./pages/FinanceBalanceSheetPage.vue')
 const FinanceIncomeStatementPage = () => import('./pages/FinanceIncomeStatementPage.vue')
 const FinanceExpenseStatementPage = () => import('./pages/FinanceExpenseStatementPage.vue')
 
-const routes = [
+export default [
   {
     path: '/finance',
     name: 'FinanceDashboard',
     component: FinanceDashboardPage,
     meta: {
-      title: 'Finance Dashboard',
+      title: 'Finance',
       requiresAuth: true,
       feature: 'finance',
       app: 'finance',
-      permission: 'finance.view',
+      permission: 'finance.dashboard.read',
+      roles: ['admin', 'receptionist'],
     },
   },
   {
@@ -34,6 +44,124 @@ const routes = [
       feature: 'finance',
       app: 'finance',
       permission: 'finance.transaction.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },
+  {
+    path: '/finance/payments',
+    name: 'FinancePayments',
+    component: FinancePaymentsPage,
+    meta: {
+      title: 'Finance Payments',
+      requiresAuth: true,
+      feature: 'finance',
+      app: 'finance',
+      permission: 'finance.payment.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },
+  {
+    path: '/finance/invoices',
+    name: 'FinanceInvoices',
+    component: FinanceInvoicesPage,
+    meta: {
+      title: 'Finance Invoices',
+      requiresAuth: true,
+      feature: 'finance',
+      app: 'finance',
+      permission: 'finance.invoice.read',
+      roles: ['admin', 'receptionist'],
+    }
+  },
+  {
+    path: '/quotation',
+    name: 'Quotation',
+    component: FinanceQuotationPage,
+    meta: {
+      title: 'Quotation',
+      requiresAuth: true,
+      feature: 'quotation',
+      app: 'quotation',
+      permission: 'finance.quotation.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },
+  {
+    path: '/finance/receivables',
+    name: 'FinanceReceivables',
+    component: FinanceReceivablesPage,
+    meta: {
+      title: 'Finance Receivables',
+      requiresAuth: true,
+      feature: 'finance',
+      app: 'finance',
+      permission: 'finance.receivables.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },
+  {
+    path: '/finance/audit',
+    name: 'FinanceAudit',
+    component: FinanceAuditPage,
+    meta: {
+      title: 'Finance Audit',
+      requiresAuth: true,
+      feature: 'finance',
+      app: 'finance',
+      permission: 'finance.audit.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },
+  {
+    path: '/finance/refunds',
+    name: 'FinanceRefunds',
+    component: FinanceRefundsPage,
+    meta: {
+      title: 'Finance Refunds',
+      requiresAuth: true,
+      feature: 'finance',
+      app: 'finance',
+      permission: 'finance.refund.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },
+  {
+    path: '/finance/expenses',
+    name: 'FinanceExpenses',
+    component: FinanceExpensesPage,
+    meta: {
+      title: 'Finance Expenses',
+      requiresAuth: true,
+      feature: 'finance',
+      app: 'finance',
+      permission: 'finance.expense.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },
+  {
+    path: '/finance/payouts',
+    name: 'FinancePayouts',
+    component: FinancePayoutsPage,
+    meta: {
+      title: 'Consultant Payouts',
+      requiresAuth: true,
+      feature: 'finance',
+      app: 'finance',
+      permission: 'finance.payout.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },
+  {
+    path: '/finance/my-payouts',
+    name: 'FinanceMyPayouts',
+    component: FinanceMyPayoutsPage,
+    meta: {
+      title: 'My Payouts',
+      requiresAuth: true,
+      feature: 'finance',
+      app: 'finance',
+      permission: 'finance.own_payout.read',
+      roles: ['consultant'],
     },
   },
   {
@@ -41,11 +169,12 @@ const routes = [
     name: 'FinanceAccounts',
     component: FinanceAccountsPage,
     meta: {
-      title: 'Chart of Accounts',
+      title: 'Finance Accounts',
       requiresAuth: true,
       feature: 'finance',
       app: 'finance',
-      permission: 'finance.account.manage',
+      permission: 'finance.account.read',
+      roles: ['admin', 'receptionist'],
     },
   },
   {
@@ -58,6 +187,7 @@ const routes = [
       feature: 'finance',
       app: 'finance',
       permission: 'finance.report.read',
+      roles: ['admin', 'receptionist'],
     },
   },
   {
@@ -70,6 +200,7 @@ const routes = [
       feature: 'finance',
       app: 'finance',
       permission: 'finance.report.read',
+      roles: ['admin', 'receptionist'],
     },
   },
   {
@@ -82,6 +213,7 @@ const routes = [
       feature: 'finance',
       app: 'finance',
       permission: 'finance.report.read',
+      roles: ['admin', 'receptionist'],
     },
   },
   {
@@ -94,8 +226,7 @@ const routes = [
       feature: 'finance',
       app: 'finance',
       permission: 'finance.report.read',
+      roles: ['admin', 'receptionist'],
     },
   },
 ]
-
-export default routes;

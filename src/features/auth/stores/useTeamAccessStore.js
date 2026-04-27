@@ -78,22 +78,22 @@ export const useTeamAccessStore = defineStore('teamAccessStore', () => {
 
   /**
    * @param {object} service
-   * @param {string} userId
+   * @param {string} user_id 
    * @param {string} reason
    * @returns {Promise<void>}
    */
-  async function suspendUser(service, userId, reason) {
-    await service.suspendUser(userId, reason)
+  async function suspendUser(service, user_id , reason) {
+    await service.suspendUser(user_id , reason)
     await load(service)
   }
 
   /**
    * @param {object} service
-   * @param {string} userId
+   * @param {string} user_id 
    * @returns {Promise<void>}
    */
-  async function reactivateUser(service, userId) {
-    await service.reactivateUser(userId)
+  async function reactivateUser(service, user_id ) {
+    await service.reactivateUser(user_id )
     await load(service)
   }
 

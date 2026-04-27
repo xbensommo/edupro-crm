@@ -3,7 +3,7 @@
  * @description Invite lifecycle and access enforcement service for invite-only onboarding.
  */
 
-import {
+import {  
   createUserWithEmailAndPassword,
   sendEmailVerification,
   signOut,
@@ -53,7 +53,7 @@ export const AUTH_COLLECTIONS = Object.freeze({
   sessions: 'sessions',
   activities: 'activities',
   passwordResetTokens: 'password-reset-tokens',
-  
+  notifications: 'notifications',
 })
 
 /**
@@ -113,6 +113,60 @@ export function createInviteAccessService( store, serverBridge = null ) {
 
   const invitePath = config?.invitePath || '/accept-invite'
   const appBaseUrl = String(config?.appBaseUrl || globalThis?.location?.origin || '').replace(/\/$/, '')
+
+
+  async function createNotification(payload = {}) {
+    const notificationsActions = store.notificationsActions
+
+    if (!notificationsActions) return null
+
+    const timestamp = new Date()
+    const baseRecord = {
+      user_id: String(payload?.user_id || payload?.uid || '').trim(),
+      title: payload.title || 'Notification',
+      message: payload.message || '',
+      event: payload.event || 'auth.event',
+      type: payload.type || 'info',
+      domain: 'auth',
+      sourceModule: 'auth',
+      channel: 'in_app',
+      status: 'unread',
+      priority: payload.priority || 'medium',
+      actionUrl: payload.actionUrl || '',
+      actionLabel: payload.actionLabel || '',
+      isActionRequired: Boolean(payload.isActionRequired),
+      entityType: payload.entityType || 'user',
+      entityId: payload.entityId || '',
+      entityLabel: payload.entityLabel || '',
+      roleScope: payload.roleScope || '',
+      actorId: store?.currentUser?.uid || '',
+      actorName: [store?.currentUser?.firstName, store?.currentUser?.lastName].filter(Boolean).join(' ') || store?.currentUser?.displayName || store?.currentUser?.email || 'System',
+      meta: payload.meta || {},
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+
+    if (!baseRecord.user_id ) return null
+    console.log(notificationsActions())
+    await notificationsActions.add(baseRecord)
+
+    return null
+  }
+
+  async function notifyRoleTargets(role, payload = {}) {
+    const users = normalizeListResult(await fetchCollection(AUTH_COLLECTIONS.users));
+    const targets = users.filter((entry) => {
+      const data = entry?.data || entry
+      const roles = Array.isArray(data?.roles) ? data.roles : [data?.role].filter(Boolean)
+      return data?.status !== ACCESS_STATUSES.SUSPENDED && roles.includes(role)
+    })
+
+    await Promise.allSettled(targets.map((entry) => {
+      const data = entry?.data || entry
+      const uid = data?.uid || entry?.id || entry?.docId || entry?._id || ''
+      return createNotification({ ...payload, user_id: uid, roleScope: role })
+    }))
+  }
 
   /**
    * @param {string} collectionName
@@ -266,6 +320,31 @@ export function createInviteAccessService( store, serverBridge = null ) {
 
       await setWithId(AUTH_COLLECTIONS.user_invites, tokenHash, inviteRecord)
 
+      await Promise.allSettled([
+        notifyRoleTargets('admin', {
+          title: 'New staff invite created',
+          message: `${inviteRecord.firstName || inviteRecord.email} was invited as ${inviteRecord.role}.`,
+          event: 'auth.user_invited',
+          type: 'info',
+          actionUrl: '/admin/team-access',
+          actionLabel: 'Open user management',
+          entityType: 'user_invite',
+          entityId: tokenHash,
+          entityLabel: inviteRecord.email,
+        }),
+        notifyRoleTargets('receptionist', {
+          title: 'New staff invite created',
+          message: `${inviteRecord.firstName || inviteRecord.email} was invited as ${inviteRecord.role}.`,
+          event: 'auth.user_invited',
+          type: 'info',
+          actionUrl: '/admin/team-access',
+          actionLabel: 'Open user management',
+          entityType: 'user_invite',
+          entityId: tokenHash,
+          entityLabel: inviteRecord.email,
+        }),
+      ])
+
       return {
         id: inviteId,
         token,
@@ -353,6 +432,40 @@ export function createInviteAccessService( store, serverBridge = null ) {
       })
 
       await sendEmailVerification(firebaseUser).catch(() => undefined)
+
+      await Promise.allSettled([
+        createNotification({
+          user_id: firebaseUser.uid,
+          title: 'Account ready',
+          message: 'Your EduProLIC account has been created successfully.',
+          event: 'auth.account_accepted',
+          type: 'success',
+          actionUrl: '/account/profile',
+          actionLabel: 'Open profile',
+          entityId: firebaseUser.uid,
+          entityLabel: profile.displayName || profile.email,
+        }),
+        notifyRoleTargets('admin', {
+          title: 'New user joined',
+          message: `${profile.displayName || profile.email} accepted an invitation.`,
+          event: 'auth.user_joined',
+          type: 'success',
+          actionUrl: '/admin/team-access',
+          actionLabel: 'Open user management',
+          entityId: firebaseUser.uid,
+          entityLabel: profile.displayName || profile.email,
+        }),
+        notifyRoleTargets('receptionist', {
+          title: 'New user joined',
+          message: `${profile.displayName || profile.email} accepted an invitation.`,
+          event: 'auth.user_joined',
+          type: 'success',
+          actionUrl: '/admin/team-access',
+          actionLabel: 'Open user management',
+          entityId: firebaseUser.uid,
+          entityLabel: profile.displayName || profile.email,
+        }),
+      ])
       return profile
     } catch (error) {
       throw normalizeAuthError(error)
@@ -370,7 +483,6 @@ export function createInviteAccessService( store, serverBridge = null ) {
         status: INVITE_STATUSES.REVOKED,
         revokedAt: timestamp,
         revokedBy: store?.currentUser?.uid || '',
-        updatedAt: timestamp,
       })
     } catch (error) {
       throw normalizeAuthError(error)
@@ -386,7 +498,7 @@ export function createInviteAccessService( store, serverBridge = null ) {
     try {
       await update( AUTH_COLLECTIONS.user_invites, inviteId, {
         expiresAt: new Date(expiresAt),
-        updatedAt: new Date(),
+        //updatedAt: new Date(),
       })
     } catch (error) {
       throw normalizeAuthError(error)
@@ -398,20 +510,43 @@ export function createInviteAccessService( store, serverBridge = null ) {
    * @param {string} [reason='']
    * @returns {Promise<void>}
    */
-  async function suspendUser(userId, reason = '') {
+  async function suspendUser(user_id , reason = '') {
     try {
       const timestamp = new Date()
-      await update(AUTH_COLLECTIONS.users, userId, {
+      await update(AUTH_COLLECTIONS.users, user_id, {
         status: ACCESS_STATUSES.SUSPENDED,
         suspendedAt: timestamp,
         suspendedBy: store.currentUser?.uid || '',
         suspensionReason: reason || 'Suspended by administrator.',
-        updatedAt: timestamp,
+        //updatedAt: timestamp,
       })
 
       if (typeof serverBridge?.disableAuthUser === 'function') {
-        await serverBridge.disableAuthUser(userId)
+        await serverBridge.disableAuthUser(user_id )
       }
+
+      await Promise.allSettled([
+        createNotification({
+          user_id,
+          title: 'Access suspended',
+          message: reason || 'Your EduProLIC account access has been suspended.',
+          event: 'auth.user_suspended',
+          type: 'warning',
+          actionUrl: '/account/profile',
+          actionLabel: 'Review account',
+          isActionRequired: true,
+          entityId: user_id,
+        }),
+        notifyRoleTargets('admin', {
+          title: 'User suspended',
+          message: `A user account was suspended.`,
+          event: 'auth.user_suspended',
+          type: 'warning',
+          actionUrl: '/admin/team-access',
+          actionLabel: 'Open user management',
+          entityId: user_id,
+        }),
+      ])
     } catch (error) {
       throw normalizeAuthError(error)
     }
@@ -421,10 +556,10 @@ export function createInviteAccessService( store, serverBridge = null ) {
    * @param {string} userId
    * @returns {Promise<void>}
    */
-  async function reactivateUser(userId) {
+  async function reactivateUser(user_id ) {
     try {
       const timestamp = new Date()
-      await update(AUTH_COLLECTIONS.users, userId, {
+      await update(AUTH_COLLECTIONS.users, user_id, {
         status: ACCESS_STATUSES.ACTIVE,
         suspendedAt: null,
         suspendedBy: null,
@@ -433,8 +568,30 @@ export function createInviteAccessService( store, serverBridge = null ) {
       })
 
       if (typeof serverBridge?.enableAuthUser === 'function') {
-        await serverBridge.enableAuthUser(userId)
+        await serverBridge.enableAuthUser(user_id )
       }
+
+      await Promise.allSettled([
+        createNotification({
+          user_id,
+          title: 'Access restored',
+          message: 'Your EduProLIC account access has been restored.',
+          event: 'auth.user_reactivated',
+          type: 'success',
+          actionUrl: '/account/profile',
+          actionLabel: 'Open profile',
+          entityId: user_id,
+        }),
+        notifyRoleTargets('admin', {
+          title: 'User reactivated',
+          message: `A user account was restored.`,
+          event: 'auth.user_reactivated',
+          type: 'success',
+          actionUrl: '/admin/team-access',
+          actionLabel: 'Open user management',
+          entityId: user_id,
+        }),
+      ])
     } catch (error) {
       throw normalizeAuthError(error)
     }

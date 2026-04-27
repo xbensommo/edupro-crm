@@ -45,6 +45,14 @@
           </option>
         </select>
       </label>
+
+      <button
+  type="button"
+  class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-semibold text-[var(--color-text,#0F172A)] transition hover:bg-[var(--color-neutral,#F8FAFC)]"
+  @click="$emit('reset')"
+>
+  Reset
+</button>
     </div>
   </section>
 </template>
@@ -78,9 +86,16 @@ defineProps({
   },
 })
 
+/*defineEmits([
+  'update:search',
+  'update:status',
+  'update:type',
+])*/
+
 defineEmits([
   'update:search',
   'update:status',
   'update:type',
+  'reset',
 ])
 </script>

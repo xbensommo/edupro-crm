@@ -9,7 +9,7 @@ export default defineCollection({
   name: 'crm_assignment_rules',
   shard: { type: 'none' },
   schema: {
-    name: { type: FIELD_TYPES.STRING, required: true, searchable: true, sortable: true },
+    rules_name: { type: FIELD_TYPES.STRING, required: true, searchable: true, sortable: true },
     targetModule: { type: FIELD_TYPES.STRING, required: true, filterable: true },
     enabled: { type: FIELD_TYPES.BOOLEAN, required: false, filterable: true },
     ownershipMode: { type: FIELD_TYPES.STRING, required: false, filterable: true },
@@ -22,11 +22,11 @@ export default defineCollection({
     updatedAt: { type: FIELD_TYPES.TIMESTAMP, readonly: true, system: true, sortable: true },
   },
   writableFields: [
-    'name', 'targetModule', 'enabled', 'ownershipMode', 'assignTo', 'assignTeam',
+    'rules_name', 'targetModule', 'enabled', 'ownershipMode', 'assignTo', 'assignTeam',
     'roundRobinKey', 'conditions', 'createdBy',
   ],
   updateableFields: [
-    'name', 'targetModule', 'enabled', 'ownershipMode', 'assignTo', 'assignTeam',
+    'rules_name', 'targetModule', 'enabled', 'ownershipMode', 'assignTo', 'assignTeam',
     'roundRobinKey', 'conditions',
   ],
   indexes: [
@@ -35,7 +35,7 @@ export default defineCollection({
   ],
   search: {
     mode: 'token-array',
-    fields: ['name', 'targetModule', 'assignTo', 'assignTeam'],
+    fields: ['rules_name', 'targetModule', 'assignTo', 'assignTeam'],
   },
   rules: {
     read: 'auth',

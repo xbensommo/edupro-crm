@@ -1,27 +1,29 @@
-# Dashboard App
+# EduProLIC Dashboard
 
-Production-ready starter dashboard app aligned with the latest Totistack generated assembly structure.
+Role-scoped Totistack dashboard for EduProLIC.
+
+## Roles supported
+- admin
+- receptionist
+- consultant
+- consultant_editor
+- sysadmin
+
+## Access model
+- **admin** and **receptionist** use the same operational dashboard scope.
+- **consultant** sees only personal work-facing visibility.
+- **consultant_editor** sees editorial workload and reporting.
+- **sysadmin** sees system status in addition to operational visibility.
 
 ## What changed
+- removed generic starter wording
+- removed fake manager/user roles
+- fixed route permissions to use real dashboard permission keys
+- updated widgets and pages to be role-scoped
+- updated analytics and reports to respect EduProLIC role boundaries
+- updated quick actions so users only see actions relevant to their role
 
-- removed the old self-initializing runtime pattern
-- removed runtime route registration and module store registration
-- moved the app to a declarative shape with `app.manifest.js`, `routes.js`, and `services/`
-- replaced the old Vuex-only dashboard store design with a service that reads from the root app store
-- kept the dashboard generic so it can be reused across many Totistack projects
-- added starter pages and widgets that are easy to extend without rewriting the core framework
-
-## Structure
-
-- `app.manifest.js` - dashboard metadata and navigation
-- `routes.js` - route contribution for generated assembly
-- `services/dashboardService.js` - generic dashboard data service
-- `components/` - reusable starter dashboard UI blocks
-- `pages/` - main dashboard, analytics, and reports starter pages
-
-## Design notes
-
-- auth and rbac belong to the root application store
-- dashboard reads from generated collection actions through the root store
-- this app intentionally avoids creating its own provider or mutating the router at runtime
-- widgets are lightweight on purpose so projects can replace them easily later
+## Remove after merge
+- `dashboard-ui-beautified.zip`
+- any old navigation config still pointing to `/a`
+- any root sidebar entries still exposing reports to consultants

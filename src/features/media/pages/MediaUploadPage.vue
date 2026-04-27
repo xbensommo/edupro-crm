@@ -1,5 +1,5 @@
 <template>
-  <FeaturePageShell eyebrow="Media" title="Upload media" description="Use this starter workflow to create media records that point to assets stored by your chosen backend.">
+  <FeaturePageShell eyebrow="Media" title="Upload system files" description="Create file records for documents uploaded into the EduProLIC system.">
     <div class="grid gap-6 xl:grid-cols-[1fr,360px]">
       <UploadDropzone @select="handleSelection" />
       <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -31,7 +31,9 @@ async function handleSelection(files) {
       extension: file.name.includes('.') ? file.name.split('.').pop() : '',
       size: file.size,
       storagePath: `uploads/${Date.now()}_${file.name}`,
-      metadata: { source: 'browser-upload-starter' },
+      metadata: { source: 'system-file-upload' },
+      sourceModule: 'media',
+      visibility: 'internal',
     })
   }
 }

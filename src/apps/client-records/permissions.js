@@ -1,6 +1,6 @@
 /**
  * @file permissions.js
- * @description Declarative permission registry for the client-records app.
+ * @description Declarative permission registry for the EduProLIC client-records app.
  */
 
 export default {
@@ -9,29 +9,46 @@ export default {
     { key: 'client_records.clients.read', resource: 'clients', action: 'read', description: 'View client records.' },
     { key: 'client_records.clients.create', resource: 'clients', action: 'create', description: 'Create client records.' },
     { key: 'client_records.clients.update', resource: 'clients', action: 'update', description: 'Update client records.' },
-    { key: 'client_records.clients.delete', resource: 'clients', action: 'delete', description: 'Delete client records.' },
-    { key: 'client_records.clients.restore', resource: 'clients', action: 'restore', description: 'Restore client records.' },
     { key: 'client_records.clients.archive', resource: 'clients', action: 'archive', description: 'Archive client records.' },
-    { key: 'client_records.clients.export', resource: 'clients', action: 'export', description: 'Export client records.' },
-    { key: 'client_records.clients.manage', resource: 'clients', action: 'manage', description: 'Full control over client records.' },
 
-    { key: 'client_records.history.read', resource: 'history', action: 'read', description: 'View client history.' },
-    { key: 'client_records.history.create', resource: 'history', action: 'create', description: 'Create history entries.' },
-    { key: 'client_records.history.update', resource: 'history', action: 'update', description: 'Update history entries.' },
-    { key: 'client_records.history.delete', resource: 'history', action: 'delete', description: 'Delete history entries.' },
-    { key: 'client_records.history.audit', resource: 'history', action: 'audit', description: 'Audit client history.' },
-    { key: 'client_records.history.manage', resource: 'history', action: 'manage', description: 'Full control over client history.' },
+    { key: 'client_records.activities.read', resource: 'activities', action: 'read', description: 'View client activities.' },
+    { key: 'client_records.activities.create', resource: 'activities', action: 'create', description: 'Log client activities.' },
 
-    { key: 'client_records.attachments.read', resource: 'attachments', action: 'read', description: 'View client attachments.' },
-    { key: 'client_records.attachments.upload', resource: 'attachments', action: 'upload', description: 'Upload client attachments.' },
-    { key: 'client_records.attachments.delete', resource: 'attachments', action: 'delete', description: 'Delete client attachments.' },
-    { key: 'client_records.attachments.manage', resource: 'attachments', action: 'manage', description: 'Full control over client attachments.' },
+    { key: 'client_records.notes.read', resource: 'notes', action: 'read', description: 'View client notes.' },
+    { key: 'client_records.notes.create', resource: 'notes', action: 'create', description: 'Add client notes.' },
+
+    { key: 'client_records.contacts.read', resource: 'contacts', action: 'read', description: 'View linked client contacts.' },
+    { key: 'client_records.contacts.create', resource: 'contacts', action: 'create', description: 'Add linked client contacts.' },
+    { key: 'client_records.contacts.update', resource: 'contacts', action: 'update', description: 'Update linked client contacts.' },
+
+    { key: 'client_records.work.read', resource: 'work', action: 'read', description: 'View CRM work linked to a client.' },
+    { key: 'client_records.work.create', resource: 'work', action: 'create', description: 'Start a new work item from a client record.' },
+
+    { key: 'client_records.notifications.emit', resource: 'notifications', action: 'emit', description: 'Emit in-app notifications for client events.' },
   ],
   roleTemplates: {
-    admin: ['client_records.clients.manage', 'client_records.history.manage', 'client_records.attachments.manage'],
-    receptionist: ['client_records.clients.read', 'client_records.clients.create', 'client_records.clients.update', 'client_records.history.read', 'client_records.history.create', 'client_records.attachments.read', 'client_records.attachments.upload'],
-    consultant: ['client_records.clients.read', 'client_records.clients.update', 'client_records.history.read', 'client_records.history.create', 'client_records.history.update', 'client_records.attachments.read', 'client_records.attachments.upload'],
-    finance_officer: ['client_records.clients.read', 'client_records.history.read', 'client_records.attachments.read'],
-    viewer: ['client_records.clients.read', 'client_records.history.read', 'client_records.attachments.read'],
+    admin: [
+      'client_records.clients.read', 'client_records.clients.create', 'client_records.clients.update', 'client_records.clients.archive',
+      'client_records.activities.read', 'client_records.activities.create',
+      'client_records.notes.read', 'client_records.notes.create',
+      'client_records.contacts.read', 'client_records.contacts.create', 'client_records.contacts.update',
+      'client_records.work.read', 'client_records.work.create', 'client_records.notifications.emit',
+    ],
+    receptionist: [
+      'client_records.clients.read', 'client_records.clients.create', 'client_records.clients.update',
+      'client_records.activities.read', 'client_records.activities.create',
+      'client_records.notes.read', 'client_records.notes.create',
+      'client_records.contacts.read', 'client_records.contacts.create', 'client_records.contacts.update',
+      'client_records.work.read', 'client_records.work.create', 'client_records.notifications.emit',
+    ],
+    consultant: [
+      'client_records.clients.read', 'client_records.activities.read', 'client_records.notes.read', 'client_records.contacts.read', 'client_records.work.read',
+    ],
+    consultant_editor: [
+      'client_records.clients.read', 'client_records.activities.read', 'client_records.notes.read', 'client_records.contacts.read', 'client_records.work.read',
+    ],
+    finance_officer: [
+      'client_records.clients.read', 'client_records.activities.read', 'client_records.notes.read', 'client_records.work.read',
+    ],
   },
 }

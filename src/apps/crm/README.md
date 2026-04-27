@@ -1,48 +1,104 @@
-# CRM App Module
+# EduProLIC CRM App
 
-Production-ready CRM starter module aligned with the latest Totistack generated assembly structure.
+This CRM is no longer treated as a generic lead-and-pipeline starter.
+It is now positioned as the **EduProLIC operations hub** that sits between:
 
-## What this module contributes
+- client-records
+- consultant assignment
+- consultant-editor review
+- notifications
+- finance handoff
 
-- `app.manifest.js` for declarative module metadata
-- `routes.js` for lazy route contribution
-- shard-provider collection definitions for:
-  - `crm_leads`
-  - `crm_contacts`
-  - `crm_accounts`
-  - `crm_opportunities`
-  - `crm_tasks`
-  - `crm_activities`
-  - `crm_notes`
-  - `crm_documents`
-  - `crm_messages`
-  - `crm_attachments`
-  - `crm_saved_views`
-  - `crm_automation_rules`
-  - `crm_assignment_rules`
-- `services/crmService.js` for root-store-driven CRM operations
-- generic starter pages and components that are easy to extend
+## What this CRM now does
 
-## Included CRM surface
+## Current packaged cleanup status
 
-- Leads
-- Contacts
-- Accounts / companies
-- Opportunities and pipeline
-- Tasks / reminders / follow-ups
-- Activities and notes timeline
-- Quotes / invoices / receipts with placeholder payloads ready for `@xbensommo/doc-generator`
-- WhatsApp / email communication logging
-- File attachment metadata
-- Search / filters / saved views
-- Workflow automation rules
-- Team assignment and ownership rules
-- Reports and customer history views
+This packaged CRM was cleaned up to match the current Totistack direction:
 
-## Architecture notes
+- `index.js` now exports `crm_files` from `collections/` instead of a non-existent `definitions/` path.
+- `services.js` now points at `services/crmService.js`, which is the source of truth.
+- legacy duplicate service files and duplicate collection-definition copies were removed from this packaged version to reduce assembly confusion.
 
-- The root application owns auth, RBAC, provider setup, and store bootstrapping.
-- This CRM app does **not** self-register routes or stores.
-- Collection actions are consumed from the generated collection registry through the root store.
-- RBAC checks automatically respect the root store runtime toggle.
-- Document generation is currently wired with realistic placeholder data so the real package can slot in later without restructuring the module.
+
+- creates client-linked work records
+- assigns work to consultants
+- supports consultant accept or deny flow
+- supports final delivery submissions
+- exposes review-ready fields for consultant-editor and admin
+- emits in-app notifications through the latest notifications feature collections
+- feeds finance by creating draft finance feeder records and consultant payout records
+
+## Collections actively used
+
+- `engagements`
+- `crm_files`
+- `crm_activities`
+- `crm_messages`
+- linked `clients`
+- linked `notifications`
+- linked `finance_transactions`
+- linked `consultant_payouts`
+
+## EduProLIC-specific workflow
+
+1. receptionist or admin creates client work
+2. consultant is assigned
+3. consultant accepts or denies
+4. consultant submits final delivery
+5. consultant-editor or admin reviews
+6. receptionist or admin delivers to client and logs payment in finance
+7. finance continues from the CRM handoff records
+
+## What should be removed from this module
+
+These files represent the older generic CRM starter surface and should be removed from the final codebase once you finish migration and confirm nothing imports them:
+
+### Generic pages to remove
+- `pages/CrmAccountsPage.vue`
+- `pages/CrmContactsPage.vue`
+- `pages/CrmDocumentsPage.vue`
+- `pages/CrmLeadDetailPage.vue`
+- `pages/CrmLeadsPage.vue`
+- `pages/CrmOpportunitiesPage.vue`
+- `pages/CrmPipelinePage.vue`
+- `pages/CrmRecordsPage.vue`
+- `pages/CrmReportsPage.vue`
+- `pages/CrmRulesPage.vue`
+- `pages/CrmSearchPage.vue`
+- `pages/CrmTasksPage.vue`
+- `pages/LeadDetailPage.vue`
+- `pages/LeadsListPage.vue`
+- `pages/OpportunitiesListPage.vue`
+
+### Generic collections to remove from the final EduProLIC CRM module
+- `collections/crm_accounts.definitions.js`
+- `collections/crm_assignment_rules.definitions.js`
+- `collections/crm_attachments.definitions.js`
+- `collections/crm_automation_rules.definitions.js`
+- `collections/crm_contacts.definitions.js`
+- `collections/crm_documents.definitions.js`
+- `collections/crm_leads.definitions.js`
+- `collections/crm_notes.definitions.js`
+- `collections/crm_opportunities.definitions.js`
+- `collections/crm_saved_views.definitions.js`
+- `collections/crm_tasks.definitions.js`
+
+### Duplicate or older service files to remove
+- `services/_crmService.js`
+- `services/crm.service.js`
+
+Keep `services/crmService.js` as the source of truth.
+
+## Integration notes
+
+### Notifications feature
+This CRM writes notifications into the latest notifications feature collection shape using:
+- `notifications`
+- event labels such as `work.assigned`, `work.assignment.accepted`, `work.assignment.denied`, and `work.final.submitted`
+
+### Finance app
+This CRM feeds finance using:
+- `finance_transactions`
+- `consultant_payouts`
+
+That means CRM becomes the operational source and finance remains the accounting/reporting layer.

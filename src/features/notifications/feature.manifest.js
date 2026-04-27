@@ -1,19 +1,15 @@
 /** @file src/features/notifications/feature.manifest.js */
 
 import notificationsRoutes from './routes.js';
-// import { NOTIFICATIONS_PERMISSIONS } from './permissions.js';
 
 export const NOTIFICATIONS_FEATURE_ID = 'notifications';
 
-/**
- * Totistack cross-cutting feature contribution.
- */
 export const notificationsFeatureManifest = {
   id: NOTIFICATIONS_FEATURE_ID,
   kind: 'feature',
-  version: '1.0.0',
+  version: '1.1.0',
   name: 'Notifications',
-  description: 'Cross-cutting notifications feature for in-app, email, and WhatsApp delivery across Totistack domains.',
+  description: 'EduProLIC notification feature for auth, finance, CRM, client-records, and work review workflows.',
   category: 'foundation',
   icon: 'fa-regular fa-bell',
   order: 58,
@@ -28,7 +24,7 @@ export const notificationsFeatureManifest = {
       to: '/notifications',
       icon: 'fa-regular fa-bell',
       order: 58,
-     // permission: NOTIFICATIONS_PERMISSIONS.VIEW,
+      permission: 'notifications.notifications.read',
     },
   ],
   shell: {
@@ -47,10 +43,12 @@ export const notificationsFeatureManifest = {
       },
     ],
   },
- // permissions: Object.values(NOTIFICATIONS_PERMISSIONS),
   routes: notificationsRoutes,
   collections: [
-    'notification_logs', 'notification_templates', 'notification_preferences', 'notifications'
+    'notification_logs',
+    'notification_templates',
+    'notification_preferences',
+    'notifications',
   ],
   capabilities: {
     inApp: true,
@@ -61,9 +59,10 @@ export const notificationsFeatureManifest = {
     logs: true,
     retries: true,
     deepLinks: true,
+    domains: ['auth', 'finance', 'crm', 'client-records'],
   },
   dependencies: {
-    features: ['auth', 'rbac']
+    features: ['auth', 'rbac'],
   },
 };
 

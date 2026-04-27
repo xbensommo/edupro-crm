@@ -1,15 +1,15 @@
 /** @file src/features/notifications/constants/notification.types.js */
 
 /**
- * High-level notification categories.
+ * High-level notification categories used across EduProLIC domains.
  */
 export const NOTIFICATION_TYPES = Object.freeze({
   SYSTEM: 'system',
-  CRM: 'crm',
-  BOOKING: 'booking',
-  FORMS: 'forms',
   AUTH: 'auth',
+  CRM: 'crm',
+  CLIENT_RECORDS: 'client_records',
   FINANCE: 'finance',
+  WORKFLOW: 'workflow',
   DOCUMENTS: 'documents',
 });
 

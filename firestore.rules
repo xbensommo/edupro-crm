@@ -1,16 +1,8 @@
-/**
- * @file firestore.rules
- * @description Firestore security rules - development only
- * @date 2026-04-13
- * @author Totistack Team
- */
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write, create, delete, update: if true; // UNSAFE for production!
     }
   }
 }

@@ -7,7 +7,7 @@ import { FIELD_TYPES, defineCollection } from '@xbensommo/shard-provider';
 
 export default defineCollection({
   name: 'crm_files',
-  shard: { type: 'monthly', field: 'createdAt' },
+  shard: { type: 'none', field: 'createdAt' },
   schema: {
     clientId: { type: FIELD_TYPES.STRING, required: false, filterable: true },
     engagementId: { type: FIELD_TYPES.STRING, required: false, filterable: true },
@@ -18,16 +18,23 @@ export default defineCollection({
     fileType: { type: FIELD_TYPES.STRING, required: false, filterable: true },
     category: { type: FIELD_TYPES.STRING, required: false, filterable: true, sortable: true },
     uploadedBy: { type: FIELD_TYPES.STRING, required: false, filterable: true },
+    uploadedByName: { type: FIELD_TYPES.STRING, required: false, filterable: true },
+    visibility: { type: FIELD_TYPES.STRING, required: false, filterable: true },
     createdAt: { type: FIELD_TYPES.TIMESTAMP, readonly: true, system: true, sortable: true, filterable: true },
     updatedAt: { type: FIELD_TYPES.TIMESTAMP, readonly: true, system: true, sortable: true },
   },
   writableFields: ['clientId', 'engagementId', 
     'name', 
     'originalName', 
-    'storagePath', 'url', 'fileType', 'category', 'uploadedBy'],
+    'storagePath', 'url', 'fileType', 'category',
+     'uploadedBy',
+     'uploadedByName',
+     'visibility',
+  ],
   updateableFields: ['name', 'storagePath', 'url', 'fileType', 'category'],
   indexes: [
     { fields: ['clientId', 'createdAt'] },
+    { fields: ['clientId', 'engagementId', 'createdAt'] },
     { fields: ['engagementId', 'createdAt'] },
     { fields: ['category', 'createdAt'] },
   ],

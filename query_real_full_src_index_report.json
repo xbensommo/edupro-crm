@@ -1,0 +1,251 @@
+{
+  "summary": {
+    "collections_analyzed": 49,
+    "sources": {
+      "with_collections_zip": "/mnt/data/WITH_COLLECTIONS.zip",
+      "src_zip": "/mnt/data/src.zip"
+    },
+    "query_real_composite_indexes": 9,
+    "query_real_plus_valid_declared_composite_indexes": 152,
+    "valid_declared_composite_indexes": 143,
+    "invalid_declared_indexes_excluded": 5
+  },
+  "query_shapes": [
+    {
+      "collection": "users",
+      "filters": [
+        "role",
+        "status"
+      ],
+      "sort": null,
+      "source": "apps/crm/pages/AddEngagementPage.vue",
+      "reason": "load active consultants for assignment",
+      "status": "added"
+    },
+    {
+      "collection": "clientActivities",
+      "filters": [
+        "clientId"
+      ],
+      "sort": [
+        "createdAt",
+        "DESCENDING"
+      ],
+      "source": "apps/client-records/services/clientService.js",
+      "reason": "load client activity timeline newest first",
+      "status": "added"
+    },
+    {
+      "collection": "clientNotes",
+      "filters": [
+        "clientId"
+      ],
+      "sort": [
+        "createdAt",
+        "DESCENDING"
+      ],
+      "source": "apps/client-records/services/clientService.js",
+      "reason": "load client notes newest first",
+      "status": "added"
+    },
+    {
+      "collection": "finance_transactions",
+      "filters": [
+        "isDeleted"
+      ],
+      "sort": [
+        "occurredOn",
+        "DESCENDING"
+      ],
+      "source": "apps/finance/services/financeQueryPresets.js",
+      "reason": "transaction list pages use explicit descending historical shard range",
+      "status": "added"
+    },
+    {
+      "collection": "payments",
+      "filters": [
+        "isDeleted"
+      ],
+      "sort": [
+        "paymentDate",
+        "DESCENDING"
+      ],
+      "source": "apps/finance/services/financeQueryPresets.js",
+      "reason": "payments page list newest first",
+      "status": "added"
+    },
+    {
+      "collection": "refunds",
+      "filters": [
+        "isDeleted"
+      ],
+      "sort": [
+        "refundDate",
+        "DESCENDING"
+      ],
+      "source": "apps/finance/services/financeQueryPresets.js",
+      "reason": "refunds page list newest first",
+      "status": "added"
+    },
+    {
+      "collection": "expenses",
+      "filters": [
+        "isDeleted"
+      ],
+      "sort": [
+        "expenseDate",
+        "DESCENDING"
+      ],
+      "source": "apps/finance/services/financeQueryPresets.js",
+      "reason": "expenses page list newest first",
+      "status": "added"
+    },
+    {
+      "collection": "consultant_payouts",
+      "filters": [
+        "isDeleted"
+      ],
+      "sort": [
+        "payoutDate",
+        "DESCENDING"
+      ],
+      "source": "apps/finance/services/financeQueryPresets.js",
+      "reason": "operations payout list newest first",
+      "status": "added"
+    },
+    {
+      "collection": "consultant_payouts",
+      "filters": [
+        "consultantId",
+        "isDeleted"
+      ],
+      "sort": [
+        "payoutDate",
+        "DESCENDING"
+      ],
+      "source": "apps/finance/services/financeQueryPresets.js",
+      "reason": "consultant own payout list newest first",
+      "status": "added"
+    }
+  ],
+  "scan_issues": [
+    {
+      "severity": "high",
+      "file": "apps/booking/pages/BookingsListPage.vue",
+      "issue": "List query orders by startTime, but bookings collection contract uses scheduledStart.",
+      "impact": "A Firestore index cannot fix this actual field mismatch; query code should be corrected to scheduledStart."
+    },
+    {
+      "severity": "high",
+      "file": "apps/crm/services/crmService.js",
+      "issue": "fetchClients default params use sortBy 'createAt', but the clients collection contracts use createdAt/updatedAt.",
+      "impact": "A Firestore index cannot fix this typo; query code should be corrected before relying on a sort index."
+    }
+  ],
+  "invalid_declared_indexes": [
+    {
+      "collection": "notifications",
+      "fields": [
+        "user_id "
+      ],
+      "invalid_fields": [
+        "user_id "
+      ],
+      "source": "zip:WITH_COLLECTIONS:WITH_COLLECTIONS/notifications.definitions.js"
+    },
+    {
+      "collection": "notifications",
+      "fields": [
+        "user_id "
+      ],
+      "invalid_fields": [
+        "user_id "
+      ],
+      "source": "zip:WITH_COLLECTIONS:WITH_COLLECTIONS/notifications.definitions.js"
+    },
+    {
+      "collection": "notifications",
+      "fields": [
+        "department",
+        "status"
+      ],
+      "invalid_fields": [
+        "department"
+      ],
+      "source": "zip:WITH_COLLECTIONS:WITH_COLLECTIONS/notifications.definitions.js"
+    },
+    {
+      "collection": "notifications",
+      "fields": [
+        "inviteId"
+      ],
+      "invalid_fields": [
+        "inviteId"
+      ],
+      "source": "zip:WITH_COLLECTIONS:WITH_COLLECTIONS/notifications.definitions.js"
+    },
+    {
+      "collection": "notifications",
+      "fields": [
+        "suspendedBy",
+        "suspendedAt"
+      ],
+      "invalid_fields": [
+        "suspendedBy",
+        "suspendedAt"
+      ],
+      "source": "zip:WITH_COLLECTIONS:WITH_COLLECTIONS/notifications.definitions.js"
+    }
+  ],
+  "collections_covered": [
+    "availability_profiles",
+    "booking_reminders",
+    "booking_services",
+    "bookings",
+    "clientActivities",
+    "clientContacts",
+    "clientNotes",
+    "clients",
+    "consultant_payouts",
+    "crm_accounts",
+    "crm_activities",
+    "crm_assignment_rules",
+    "crm_attachments",
+    "crm_automation_rules",
+    "crm_contacts",
+    "crm_documents",
+    "crm_files",
+    "crm_leads",
+    "crm_messages",
+    "crm_notes",
+    "crm_opportunities",
+    "crm_saved_views",
+    "crm_tasks",
+    "dashboard_configs",
+    "document_audit_logs",
+    "document_sequences",
+    "document_templates",
+    "documents",
+    "engagements",
+    "expenses",
+    "finance_accounts",
+    "finance_journal_entries",
+    "finance_periods",
+    "finance_transactions",
+    "journal_entries",
+    "journal_lines",
+    "kpi_snapshots",
+    "notification_logs",
+    "notification_preferences",
+    "notification_templates",
+    "notifications",
+    "password-reset-tokens",
+    "payments",
+    "refunds",
+    "roles",
+    "sessions",
+    "share_rules",
+    "user_invites",
+    "users"
+  ]
+}

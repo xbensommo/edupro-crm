@@ -29,11 +29,11 @@ export function createAccessModuleBindings({ authAccessService, inviteAccessServ
     extendInvite(inviteId, expiresAt) {
       return inviteAccessService.extendInvite(inviteId, expiresAt)
     },
-    suspendUser(userId, reason) {
-      return inviteAccessService.suspendUser(userId, reason)
+    suspendUser(user_id , reason) {
+      return inviteAccessService.suspendUser(user_id , reason)
     },
-    reactivateUser(userId) {
-      return inviteAccessService.reactivateUser(userId)
+    reactivateUser(user_id ) {
+      return inviteAccessService.reactivateUser(user_id )
     },
   }
 }

@@ -1,19 +1,38 @@
-# Totistack Notifications Feature
+# EduProLIC Notifications Feature
 
-Production-ready Totistack notifications feature built for the current framework shape.
+Production-ready Totistack notifications feature adapted for the EduProLIC business flow.
 
-## What is included
+## What it covers
 
-- `feature.manifest.js`
-- `routes.js`
-- `collections.definitions.js`
-- `permissions.js`
-- event-driven notification orchestration
-- in-app, email, and WhatsApp adapter contracts
-- bell, drawer, list, filters, preferences, templates, logs UI
-- Pinia store + composables
-- runtime registration helpers
-- Node tests
+This version is built for these domains:
+
+- `auth`
+- `finance`
+- `crm`
+- `client-records`
+
+It supports EduProLIC workflow events such as:
+
+- client record created / updated
+- work created
+- work assigned to consultant
+- consultant accepted / denied assignment
+- final delivery submitted
+- consultant-editor approved / denied work
+- payment logged
+- commission ready / deducted / paid
+- user invited / suspended / role changed
+
+## Core idea
+
+Other features should emit domain events.
+The notifications feature decides:
+
+- who receives the notification
+- which channel is allowed
+- what template to use
+- what gets stored in-app
+- what gets logged for delivery history
 
 ## Install into Totistack
 
@@ -23,15 +42,7 @@ Copy this folder into:
 src/features/notifications/
 ```
 
-Then make sure Totistack discovers:
-
-- `src/features/*/feature.manifest.js`
-- `src/features/*/routes.js`
-- `src/features/*/collections.definitions.js`
-
 ## Runtime wiring
-
-At app boot, register the feature:
 
 ```js
 import { registerNotificationsFeature } from '@/features/notifications'
@@ -44,37 +55,45 @@ registerNotificationsFeature({
   eventBus,
   serviceRegistry,
   currentUser: () => authStore.user,
+  userDirectory,
 })
 ```
 
-In the app shell, mount the bell and drawer:
+## Example domain events
 
-```vue
-<NotificationBell />
-<NotificationDrawer />
+```js
+await eventBus.emit('crm.work.assigned', {
+  entityId: engagementId,
+  entityType: 'engagement',
+  entityLabel: engagementCode,
+  clientName,
+  assignedConsultantId,
+  actorId: currentUser.uid,
+  actorName: currentUser.displayName,
+  actionUrl: `/crm/work/v/${engagementId}`,
+  actionLabel: 'Open work',
+  isActionRequired: true,
+})
 ```
 
-## Event-first usage
+```js
+await eventBus.emit('finance.commission.paid', {
+  entityId: payoutId,
+  entityType: 'commission_payout',
+  entityLabel: engagementCode,
+  consultantId,
+  amountPaid,
+  actorId: currentUser.uid,
+  actorName: currentUser.displayName,
+})
+```
 
-Business modules should emit domain events, not call channels directly.
+## Role behavior
 
-Examples:
-
-- `lead.created`
-- `lead.assigned`
-- `booking.confirmed`
-- `form.submitted`
-- `document.generated`
-- `user.role.changed`
-- `invoice.overdue`
-
-The notifications feature listens and decides:
-
-- recipients
-- channel
-- template
-- persistence
-- delivery log
+- `admin`: full visibility and management
+- `receptionist`: operational notifications and payment/workflow visibility
+- `consultant`: own work and own commission notifications
+- `consultant_editor`: review workflow notifications
 
 ## Collections
 
@@ -83,32 +102,7 @@ The notifications feature listens and decides:
 - `notification_templates`
 - `notification_logs`
 
-## Permissions
-
-- `notifications.view`
-- `notifications.manage`
-- `notifications.preferences.manage`
-- `notifications.templates.manage`
-- `notifications.logs.view`
-- `notifications.dispatch`
-
-## Theme
-
-The UI inherits the host Totistack theme through CSS variables such as:
-
-- `--color-primary`
-- `--color-secondary`
-- `--color-accent`
-- `--color-text`
-- `--color-muted`
-- `--color-surface`
-- `--color-surface-muted`
-- `--color-border`
-
-No feature-level theme override is required.
-
 ## Notes
 
-- This feature uses `@xbensommo/shard-provider` collection definitions.
-- Runtime adapter hooks are intentionally thin so you do not need to rewrite every feature.
-- Channel adapters accept provider functions, so email and WhatsApp can be swapped later without changing business modules.
+- This feature is EduProLIC-specific in event design, but reusable across Totistack features.
+- It is intended to be emitted from auth, finance, crm, and client-records without duplicating notification logic.

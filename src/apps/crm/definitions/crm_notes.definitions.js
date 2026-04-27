@@ -7,7 +7,7 @@ import { FIELD_TYPES, defineCollection } from '@xbensommo/shard-provider';
 
 export default defineCollection({
   name: 'crm_notes',
-  shard: { type: 'monthly', field: 'createdAt' },
+  shard: { type: 'none', field: 'createdAt' },
   schema: {
     clientId: { type: FIELD_TYPES.STRING, required: false, filterable: true },
     engagementId: { type: FIELD_TYPES.STRING, required: false, filterable: true },

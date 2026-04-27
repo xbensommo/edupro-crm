@@ -350,7 +350,7 @@ const canAccessRoute = (routeMeta = {}) => {
         accessRuntime = createAuthAccessService({
           auth,
           state,
-          shardProvider,
+          //shardProvider,
           collectionActions: getCollectionActions,
           config: accessConfig,
           accessControl,

@@ -1,69 +1,81 @@
 /**
  * @file main.js
- * @description Application entry point.
- * @date 2026-04-14
+ * @description Application entry point for normal Vite SPA.
+ * @date 2026-04-22
  */
 
-import { ViteSSG } from 'vite-ssg';
+import { createApp } from 'vue';
 import { createPinia } from 'pinia';
+import { createRouter, createWebHistory } from 'vue-router';
+
 import App from './App.vue';
 import { routes, installRouterGuards, scrollBehavior } from './app/router/index.js';
 import { registerRootProviders } from './app/provider/provider.js';
 import { bootstrapApp } from './app/boot/bootstrap.js';
-import { installActionPipeline } from '@action_modal/plugins/action-plugin.js'; 
-//import { useAppStore } from './app/stores/appStore/index.js';
+import { installActionPipeline } from '@action_modal/plugins/action-plugin.js';
 import { createAuthActionDefinitions } from '@features/auth/auth.actions.js';
-//import { createCrmActionDefinitions } from './crm/crm.actions.js';
 
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'vue-sonner/style.css';
-import '@/assets/css/main.css'
+import '@/assets/css/main.css';
 
 /**
- * Vite SSG application factory.
+ * Build and mount the SPA.
  */
-export const createApp = ViteSSG(App, { routes, scrollBehavior }, async ({ app, router }) => {
+async function mountApp() {
+  const app = createApp(App);
   const pinia = createPinia();
+
+  const router = createRouter({
+    history: createWebHistory(import.meta.env.BASE_URL),
+    routes,
+    scrollBehavior,
+  });
+
   app.use(pinia);
-  
+  app.use(router);
+
   registerRootProviders(app);
-  
+
   installRouterGuards(router);
 
-  await bootstrapApp();
-
   app.config.errorHandler = (error) => {
-    if (!import.meta.env.SSR) {
-      console.trace(error, app, router)
-      router.push({
-        name: '500',
-        query: {
-          message: 'Application Crash',
-          reason: 'A critical rendering error occurred.',
-        },
-      });
-    }
-  };
+    console.trace(error);
 
-  if (!import.meta.env.SSR) {
-    window.addEventListener('unhandledrejection', () => {
-      router.push({
-        name: '500',
-        query: {
-          message: 'Server Error',
-          reason: 'Our systems are experiencing a technical issue.',
-        },
-      });
+    router.push({
+      name: '500',
+      query: {
+        message: 'Application Crash',
+        reason: 'A critical rendering error occurred.',
+      },
     });
   };
+
+  window.addEventListener('unhandledrejection', () => {
+    router.push({
+      name: '500',
+      query: {
+        message: 'Server Error',
+        reason: 'Our systems are experiencing a technical issue.',
+      },
+    });
+  });
 
   installActionPipeline(app, {
     actions: [
       ...createAuthActionDefinitions(),
-      // ...createCrmActionDefinitions(),
     ],
     normalizeError(error) {
       return error instanceof Error ? error : new Error('Action failed.');
     },
   });
+
+  await bootstrapApp();
+  await router.isReady();
+
+  app.mount('#app');
+}
+
+mountApp().catch((error) => {
+  console.error('[main] Failed to mount application.', error);
 });

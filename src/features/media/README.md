@@ -1,12 +1,17 @@
-# Media feature
+# EduProLIC Media feature
 
-Enterprise-ready starter feature for:
+This media feature is no longer a generic starter. It is positioned as the system file library for EduProLIC.
 
-- media asset metadata
-- folders
-- upload workflow shells
-- starter media library UI
+## What it now does
+- file upload metadata for system files
+- file download activity recording
+- user attribution on upload and download
+- in-app notifications for upload and download events
+- shared file access routes for admin, receptionist, consultant, consultant_editor, and sysadmin
 
-## Production note
+## Important boundary
+This feature stores and audits file records. Binary upload storage still needs your project-level Firebase Storage or equivalent implementation.
 
-The starter service manages metadata records only. Plug actual binary uploads into Firebase Storage, S3, R2, or your preferred storage provider at project level.
+## What to remove after merge
+- any old `/admin/media` navigation link
+- any old text that still calls this a starter workflow shell

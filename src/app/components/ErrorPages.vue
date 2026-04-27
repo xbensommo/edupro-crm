@@ -1,13 +1,8 @@
 <script setup>
 import { useRouter } from 'vue-router';
-import { useHead } from '@unhead/vue';
 
 const router = useRouter();
 const props = defineProps(['code', 'message', 'description']);
-
-useHead({
-  title: `${props.code || 'Notice'} | EduPro CRM System`
-});
 
 
 const goBack = () => {

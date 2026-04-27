@@ -25,10 +25,11 @@
       <label class="grid gap-2">
         <span class="field-label mb-0">Primary role</span>
         <select v-model="form.role" class="select-field">
-          <option value="user">User</option>
           <option value="receptionist">Receptionist</option>
           <option value="consultant">Consultant</option>
+          <option value="consultant_editor">Consultant editor</option>
           <option value="admin">Admin</option>
+          <option value="sysadmin">Sysadmin</option>
         </select>
       </label>
       <label class="grid gap-2">

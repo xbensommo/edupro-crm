@@ -21,6 +21,7 @@ const routes = [
         icon: 'fa-regular fa-file-lines',
         order: 70,
         permission: 'documents.view',
+        roles: ['sys_admin'],
       },
     }
   ];

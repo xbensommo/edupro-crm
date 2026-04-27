@@ -3,10 +3,10 @@
 export * from './feature.manifest.js';
 export * from './routes.js';
 export * from './permissions.js';
-export * from './definitions/notification_logs.definitions.js';
-export * from './definitions/notification_templates.definitions.js';
-export * from './definitions/notification_preferences.definitions.js';
-export * from './definitions/notifications.definitions.js';
+export * from './collections/notification_logs.definitions.js';
+export * from './collections/notification_templates.definitions.js';
+export * from './collections/notification_preferences.definitions.js';
+export * from './collections/notifications.definitions.js';
 
 export * from './constants/notification.channels.js';
 export * from './constants/notification.events.js';

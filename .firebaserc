@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "edupro-writer"
+  },
+  "targets": {
+    "edupro-writer": {
+      "hosting": {
+        "edupro-staff": [
+          "edupro-staff"
+        ]
+      }
+    }
   }
 }

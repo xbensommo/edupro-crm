@@ -1,5 +1,5 @@
 <template>
-  <CrmPageShell title="Team Access" description="Invite staff, manage onboarding links, and suspend or restore system access.">
+  <CrmPageShell title="User Management" description="Invite staff, manage onboarding links, assign EduProLIC roles, and suspend or restore access.">
     <div class="space-y-6">
       <InviteStatsGrid :metrics="teamAccess.snapshot.metrics" />
 
@@ -56,8 +56,6 @@ const inviteService = createInviteAccessService(appStore)
 
 const visibleInvites = computed(() => appStore.user_invites.items)
 
-console.trace(visibleInvites.value)
-
 async function refresh() {
   try {
     await teamAccess.load(inviteService)
@@ -85,28 +83,30 @@ async function handleCreateInvite(payload) {
 }
 
 async function handleCopyInvite(invite) {
-  if (!invite?.inviteUrl) return
-  await navigator.clipboard.writeText(invite.inviteUrl).catch(() => undefined)
+  if (!invite?.data) return
+  await navigator.clipboard.writeText(invite.data.inviteUrl).catch(() => undefined)
   toast.success('Invite link copied.')
 }
 
 async function handleExtendInvite(invite) {
-  const next = new Date(invite.expiresAt || Date.now())
+  const next = new Date(invite.data.expiresAt || Date.now())
   next.setDate(next.getDate() + 7)
-
-  try {
-    await teamAccess.extendInvite(appStore, invite.id, next)
+  toast.error('Unable to extend invite.', {
+      description: 'Feature not enabled.',
+    })
+  /* try {
+    await teamAccess.extendInvite(inviteService, invite.id, next)
     toast.success('Invite extended by 7 days.')
   } catch (error) {
     toast.error('Unable to extend invite.', {
       description: error?.message || 'Please try again.',
     })
-  }
+  } */
 }
 
 async function handleRevokeInvite(invite) {
   try {
-    await teamAccess.revokeInvite(appStore, invite.id)
+    await teamAccess.revokeInvite(inviteService, invite.id)
     toast.success('Invite revoked.')
   } catch (error) {
     toast.error('Unable to revoke invite.', {
@@ -143,8 +143,8 @@ async function handleSuspendConfirm(reason) {
   if (!selectedUser.value) return
 
   try {
-    await teamAccess.suspendUser(appStore, selectedUser.value.id || selectedUser.value.uid, reason)
-    toast.success('User suspended successfully.')
+    await teamAccess.suspendUser(inviteService, selectedUser.value.id || selectedUser.value.uid, reason)
+    toast.success('User access suspended successfully.')
     closeSuspendModal()
   } catch (error) {
     toast.error('Unable to suspend user.', {
@@ -155,8 +155,8 @@ async function handleSuspendConfirm(reason) {
 
 async function handleReactivateUser(user) {
   try {
-    await teamAccess.reactivateUser(appStore, user.id || user.uid)
-    toast.success('User reactivated successfully.')
+    await teamAccess.reactivateUser(inviteService, user.id || user.uid)
+    toast.success('User access restored successfully.')
   } catch (error) {
     toast.error('Unable to reactivate user.', {
       description: error?.message || 'Please try again.',

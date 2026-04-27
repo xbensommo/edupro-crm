@@ -22,7 +22,9 @@ import {
   updatePassword,
   updateProfile as updateFirebaseProfile,
 } from 'firebase/auth'
-import { createShardedActions } from '@xbensommo/shard-provider'
+
+//import { useAppStore } from '@app/stores/appStore'
+
 import { normalizeAuthError } from '../utils/auth.errors.js'
 
 import {
@@ -32,21 +34,6 @@ import {
 } from '../utils/inviteAccess.helpers.js'
 
 import { resolveAccessProfile } from '../utils/resolve-access-profile.js'
-
-import {
-  createActivityLogger,
-  createCollectionAdapter,
-  createSequence,
-  createServiceContext,
-  generateStableId,
-  getRecordId,
-  asStringArray,
-  normalizeDate,
-   asNumber,
-   asText,
-  asMoney,
-  withActivityLog,
-} from '@core_services/index.js'
 
 /**
  * Create a provider instance for popup-based social auth.
@@ -146,23 +133,6 @@ function buildProfileSnapshot(firebaseUser, existing, profileData = {}, config =
   }
 }
 
-/**
- * Resolve the users collection actions.
- *
- * @param {object} options
- * @param {string} options.userCollectionName
- * @param {(collectionName: string) => object} [options.collectionActions]
- * @param {object} options.state
- * @param {object} options.shardProvider
- * @returns {object}
- */
-function resolveUsersActions({ userCollectionName, collectionActions, state, shardProvider }) {
-  const resolved = typeof collectionActions === 'function'
-    ? collectionActions(userCollectionName)
-    : null
-
-  return resolved || createShardedActions(userCollectionName, state, shardProvider)
-}
 
 /**
  * Build the auth access service used by the root access runtime.
@@ -181,20 +151,14 @@ function resolveUsersActions({ userCollectionName, collectionActions, state, sha
 export function createAuthAccessService({
   auth,
   state,
-  shardProvider,
-  collectionActions,
   config = {},
   accessControl,
+  collectionActions,
   storeApi,
   inviteAccessService,
 }) {
-  const userCollectionName = config?.profileCollection || 'users'
-  const usersActions = resolveUsersActions({
-    userCollectionName,
-    collectionActions,
-    state,
-    shardProvider,
-  })
+
+ const usersActions = collectionActions('users')
 
   let initialized = false
   let initializePromise = null

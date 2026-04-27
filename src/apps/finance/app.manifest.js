@@ -1,49 +1,55 @@
 /**
  * @file src/apps/finance/app.manifest.js
- * @description Totistack finance app manifest.
+ * @description EduProLIC finance app manifest.
  */
-
-//import routes from './routes/index.js'
-//import navigation from './navigation.js'
-// import definitions from './definitions/index.js'
-/*import {
-  FINANCE_ACTIONS,
-  FINANCE_ROLES,
-} from './permissions/finance.permissions.js'*/
 
 export default {
   id: 'finance',
   type: 'app',
   name: 'Finance',
-  description: 'Double-entry accounting, finance operations, and ledger-derived reporting for Totistack.',
-  version: '2.1.0',
-  //routes,
-  //navigation,
+  description: 'EduProLIC finance operations for invoices, receivables, payments, refunds, consultant commissions, payouts, expenses, audit, posting, and reports.',
+  version: '3.0.0',
   navigation: {
     label: 'Finance',
     icon: 'book',
     priority: 20,
-    roles: ['admin', 'manager', 'sales'],
+    roles: ['admin', 'receptionist', 'consultant'],
   },
   collections: [
-    'accounts', 'Journal-entries', 'periods', 'transactions'
+    'finance_accounts',
+    'finance_transactions',
+    'finance_journal_entries',
+    'finance_periods',
+    'payments',
+    'refunds',
+    'expenses',
+    'consultant_payouts',
+    'share_rules',
+    'invoices',
+    'invoice_items',
+    'payment_allocations',
+    'finance_audit_logs',
+    'notifications',
   ],
-  /*permissions: {
-    roles: FINANCE_ROLES,
-    actions: FINANCE_ACTIONS,
-  },*/
   dependencies: {
-    features: ['auth', 'rbac'],
-    apps: []
-  },  
+    features: ['auth', 'rbac', 'notifications'],
+    apps: ['crm'],
+  },
   capabilities: [
-    'double-entry-ledger',
+    'eduprolic-finance-operations',
+    'client-invoicing',
+    'payment-allocation',
+    'receivables-control',
+    'finance-audit-trail',
+    'client-payment-ledger-posting',
+    'client-refund-control',
+    'consultant-commission-accrual',
+    'consultant-payout-tracking',
+    'expense-posting',
     'balance-sheet',
     'income-statement',
     'expense-statement',
-    'draft-review-post-flow',
-    'confirm-guarded-actions',
-    'period-closing',
-    'rbac-finance-operations',
+    'notifications-integration',
+    'crm-finance-handoff',
   ],
 }

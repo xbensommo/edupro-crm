@@ -7,63 +7,19 @@ export default [
   {
     path: '/auth',
     component: () => import('./pages/AuthLayout.vue'),
-    meta: {
-      guestOnly: true,
-      requiresAuth: false,
-      title: 'Authentication',
-    },
+    meta: { guestOnly: true, requiresAuth: false, title: 'Authentication', hideInNav: true },
     children: [
-      {
-        path: '',
-        name: 'auth.login',
-        component: () => import('./pages/login.vue'),
-        meta: {
-          guestOnly: true,
-          requiresAuth: false,
-          title: 'Sign in',
-        },
-      },
-      {
-        path: 'register',
-        name: 'auth.register-closed',
-        component: () => import('./pages/register.vue'),
-        meta: {
-          guestOnly: true,
-          requiresAuth: false,
-          title: 'Invitation required',
-        },
-      },
-      {
-        path: 'forgot-password',
-        name: 'auth.forgot-password',
-        component: () => import('./pages/forgot-password.vue'),
-        meta: {
-          guestOnly: true,
-          requiresAuth: false,
-          title: 'Forgot password',
-        },
-      },
-      {
-        path: 'reset-password',
-        name: 'auth.reset-password',
-        component: () => import('./pages/reset-password.vue'),
-        meta: {
-          guestOnly: true,
-          requiresAuth: false,
-          title: 'Reset password',
-        },
-      },
+      { path: '', name: 'auth.login', component: () => import('./pages/login.vue'), meta: { guestOnly: true, requiresAuth: false, title: 'Sign in' } },
+      { path: 'register', name: 'auth.register-closed', component: () => import('./pages/register.vue'), meta: { guestOnly: true, requiresAuth: false, title: 'Invitation required' } },
+      { path: 'forgot-password', name: 'auth.forgot-password', component: () => import('./pages/forgot-password.vue'), meta: { guestOnly: true, requiresAuth: false, title: 'Forgot password' } },
+      { path: 'reset-password', name: 'auth.reset-password', component: () => import('./pages/reset-password.vue'), meta: { guestOnly: true, requiresAuth: false, title: 'Reset password' } },
     ],
   },
   {
     path: '/accept-invite',
     name: 'auth.accept-invite',
     component: () => import('./pages/accept-invite.vue'),
-    meta: {
-      guestOnly: true,
-      requiresAuth: false,
-      title: 'Accept invitation',
-    },
+    meta: { guestOnly: true, requiresAuth: false, title: 'Accept invitation', hideInNav: true },
   },
   {
     path: '/admin/team-access',
@@ -72,12 +28,9 @@ export default [
     meta: {
       requiresAuth: true,
       guestOnly: false,
-      title: 'Team access',
-      roles: ['admin', 'receptionist'],
-      permissions: [
-        'auth.invites.create', 
-        'auth.invites.update'
-      ],
+      title: 'User management',
+      roles: ['admin', 'receptionist', 'sysadmin'],
+      permissions: ['auth.users.read', 'auth.users.manage', 'auth.invites.read'],
     },
   },
   {
@@ -87,8 +40,8 @@ export default [
     meta: {
       requiresAuth: true,
       title: 'My profile',
-      roles: ['admin', 'receptionist', 'consultant'],
-      permissions: ['auth.invites.read']
+      roles: ['admin', 'receptionist', 'consultant', 'consultant_editor', 'sysadmin'],
+      permissions: ['auth.invites.read'],
     },
   },
 ]

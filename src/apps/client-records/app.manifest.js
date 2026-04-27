@@ -1,25 +1,25 @@
 /**
  * @file app.manifest.js
- * @description Declarative manifest for the Client Records Totistack app.
+ * @description Declarative manifest for the EduProLIC Client Records app.
  */
 
 export default {
   id: 'client-records',
   type: 'app',
   name: 'Client Records',
-  version: '3.0.0',
+  version: '4.0.0',
   description:
-    'Centralized client records with contacts, activities, notes, and reusable UI starters.',
+    'EduProLIC client records for receptionist/admin intake, CRM work handoff, notification events, and client history.',
   dependencies: {
-    features: ['auth', 'rbac'],
-    apps: [],
+    features: ['auth', 'rbac', 'notifications'],
+    apps: ['crm', 'finance'],
   },
   navigation: {
     label: 'Clients',
     icon: 'Users',
     priority: 20,
     requiresAuth: true,
-    roles: ['admin', 'receptionist', 'consultant']
+    roles: ['admin', 'receptionist', 'consultant', 'consultant_editor', 'finance_officer'],
   },
   collections: ['clients', 'clientContacts', 'clientActivities', 'clientNotes'],
 }

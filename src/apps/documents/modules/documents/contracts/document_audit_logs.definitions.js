@@ -7,7 +7,7 @@ import { FIELD_TYPES, defineCollection } from '@xbensommo/shard-provider';
  */
 export const documentAuditLogsCollection = defineCollection({
   name: 'document_audit_logs',
-  shard: { type: 'monthly' },
+  shard: { type: 'none' },
   timestamps: true,
   schema: {
     documentId: { type: FIELD_TYPES.STRING, required: true, filterable: true },

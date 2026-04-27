@@ -107,6 +107,7 @@ export default defineCollection({
     { fields: ['clientId', 'updatedAt'] },
     { fields: ['email', 'updatedAt'] },
     { fields: ['clientId', 'isPrimary'] },
+    { fields: ['clientId'] },
     { fields: ['role', 'updatedAt'] },
   ],
   search: {

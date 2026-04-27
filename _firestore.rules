@@ -1,0 +1,536 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------
+    // Identity and role helpers
+    // ------------------------------------------------------------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function userDocPath(id) {
+      return /databases/$(database)/documents/users/$(id);
+    }
+
+    function userProfileExists() {
+      return signedIn() && exists(userDocPath(uid()));
+    }
+
+    function userProfile() {
+      return get(userDocPath(uid())).data;
+    }
+
+    function hasRole(role) {
+      return userProfileExists() && (
+        userProfile().role == role ||
+        (userProfile().roles is list && role in userProfile().roles)
+      );
+    }
+
+    function isSysAdmin() {
+      return hasRole('sysadmin');
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isReceptionist() {
+      return hasRole('receptionist');
+    }
+
+    function isConsultant() {
+      return hasRole('consultant');
+    }
+
+    function isConsultantEditor() {
+      return hasRole('consultant_editor');
+    }
+
+    // EduProLIC operations staff with day-to-day business control.
+    function isOperations() {
+      return isSysAdmin() || isAdmin() || isReceptionist();
+    }
+
+    // Higher-trust administrators for destructive config changes.
+    function isAdminCore() {
+      return isSysAdmin() || isAdmin();
+    }
+
+    // Finance collections use financeOrAdmin in definitions, but the actual
+    // EduProLIC business operators are admin/receptionist/sysadmin.
+    function isFinanceOps() {
+      return isOperations() || hasRole('finance');
+    }
+
+    function isSelf(userId) {
+      return signedIn() && uid() == userId;
+    }
+
+    function authEmail() {
+      return signedIn() && request.auth.token.email != null
+        ? request.auth.token.email
+        : null;
+    }
+
+    function emailMatchesAuth(email) {
+      return signedIn() && authEmail() != null && email == authEmail();
+    }
+
+    function isOwnerField(doc) {
+      return signedIn() && (
+        doc.owner == uid() ||
+        doc.assignedTo == uid() ||
+        doc.createdBy == uid() ||
+        doc.user_id == uid() ||
+        doc.consultantId == uid() ||
+        doc.assignedConsultantId == uid() ||
+        doc.assignedEditorId == uid() ||
+        doc.receivedByUserId == uid() ||
+        doc.relatedUserId == uid() ||
+        doc.uploadedBy == uid()
+      );
+    }
+
+    function canReadOwnOrOps(doc) {
+      return isOperations() || isOwnerField(doc);
+    }
+
+    function onlyChanges(allowedKeys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedKeys);
+    }
+
+    function onlyCreates(allowedKeys) {
+      return request.resource.data.keys().hasOnly(allowedKeys);
+    }
+
+    function isAssignedConsultant(doc) {
+      return signedIn() && doc.assignedConsultantId == uid();
+    }
+
+    function isAssignedEditor(doc) {
+      return signedIn() && doc.assignedEditorId == uid();
+    }
+
+    function consultantEngagementUpdateAllowed() {
+      return isAssignedConsultant(resource.data) &&
+        onlyChanges([
+          'assignmentRespondedByName',
+          'assignmentRespondedBy',
+          'assignmentRespondedAt',
+          'assignmentStatus',
+          'hasAttachments',
+          'attachmentsCount',
+          'files',
+          'fileUrls',
+          'status',
+          'deliveryStatus',
+          'submittedAt',
+          'deliveredAt',
+          'completedAt',
+          'remarks',
+          'finalFiles',
+          'finalUpdates',
+          'finalFileUrls',
+          'finalAttachmentsCount',
+          'finalRemarks',
+          'finalSubmittedAt',
+          'finalSubmittedBy',
+          'finalSubmittedByName',
+          'updatedAt'
+        ]);
+    }
+
+    function editorEngagementUpdateAllowed() {
+      return isAssignedEditor(resource.data) &&
+        onlyChanges([
+          'reviewStatus',
+          'reviewRespondedAt',
+          'reviewRespondedBy',
+          'reviewRespondedByName',
+          'reviewRemarks',
+          'reviewDeductionPercent',
+          'updatedAt'
+        ]);
+    }
+
+    function taskActorUpdateAllowed() {
+      return (resource.data.assignedTo == uid() || resource.data.createdBy == uid()) &&
+        onlyChanges([
+          'status',
+          'priority',
+          'dueAt',
+          'reminderAt',
+          'completedAt',
+          'updatedAt'
+        ]);
+    }
+
+    function ownNotificationUpdateAllowed() {
+      return resource.data.user_id == uid() &&
+        onlyChanges(['status', 'readAt', 'archivedAt', 'updatedAt']);
+    }
+
+    function ownPreferenceCreateAllowed() {
+      return signedIn() && request.resource.data.user_id == uid();
+    }
+
+    function ownPreferenceUpdateAllowed() {
+      return resource.data.user_id == uid() &&
+        onlyChanges(['enabled', 'channels', 'quietHours', 'categorySettings', 'updatedAt']);
+    }
+
+    function ownSessionCreateAllowed(userId) {
+      return signedIn() && request.resource.data.user_id == uid() && userId != '';
+    }
+
+    function ownSessionUpdateAllowed() {
+      return resource.data.user_id == uid() && onlyChanges(['userAgent', 'provider', 'isActive', 'updatedAt', 'lastActivityAt']);
+    }
+
+    function ownSavedViewCreateAllowed() {
+      return signedIn() && request.resource.data.owner == uid();
+    }
+
+    function ownSavedViewAllowed() {
+      return resource.data.owner == uid();
+    }
+
+    // ------------------------------------------------------------
+    // Sensitive auth collections
+    // ------------------------------------------------------------
+    match /roles/{docId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /users/{userId} {
+      allow read: if isOperations() || isSelf(userId);
+      allow create: if isOperations() || (
+        isSelf(userId) &&
+        emailMatchesAuth(request.resource.data.email) /*&&
+        onlyCreates([
+          'email', 'uid', 'user_id', 'displayName', 'firstName', 'lastName',
+          'phoneNumber', 'photoURL', 'emailVerified','department' ,'role', 'createdAt', 'updatedAt', 'lastLoginAt'
+        ])*/
+      );
+      allow update: if isOperations() || (
+        isSelf(userId) &&
+        onlyChanges([
+          'displayName', 'firstName', 'lastName', 'phoneNumber', 'photoURL',
+          'emailVerified', 'lastLoginAt', 'updatedAt','status'
+        ])
+      );
+      allow delete: if isAdminCore();
+    }
+
+    match /user_invites/{docId} {
+      // Allow staff to manage all invites
+      // Allow an unauthenticated user to 'get' a specific invite to verify it
+      allow get: if true; 
+      allow list: if isOperations();
+      allow create, delete: if isOperations();
+      
+      allow update: if isOperations() || (
+        // Allow the user to update their own invite if the emails match
+        emailMatchesAuth(resource.data.email) &&
+        // Strict control: only allow them to change the status and set the acceptedAt/uid fields
+        onlyChanges(['status', 'acceptedAt', 'acceptedByUid', 'updatedAt'])
+      );
+    }
+
+    match /password-reset-tokens/{docId} {
+      allow read, write: if false;
+    }
+
+    match /sessions/{docId} {
+      allow read: if isOperations() || (signedIn() && resource.data.user_id == uid());
+      allow create: if isOperations() || ownSessionCreateAllowed(docId);
+      allow update: if isOperations() || ownSessionUpdateAllowed();
+      allow delete: if isOperations() || (signedIn() && resource.data.user_id == uid());
+    }
+
+    // ------------------------------------------------------------
+    // Client records
+    // ------------------------------------------------------------
+    match /clients/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /clientContacts/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /clientActivities/{docId} {
+      allow read: if isOperations() || (signedIn() && resource.data.isPublic == true && resource.data.user_id == uid());
+      allow create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /clientNotes/{docId} {
+      allow read: if isOperations() || (signedIn() && resource.data.isPublic == true && resource.data.user_id == uid());
+      allow create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    // ------------------------------------------------------------
+    // CRM pipeline and supporting records
+    // ------------------------------------------------------------
+    match /crm_accounts/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_contacts/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_leads/{docId} {
+      allow create: if true;
+      allow read, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_opportunities/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_saved_views/{docId} {
+      allow read: if isOperations() || ownSavedViewAllowed() || resource.data.visibility == 'public' || resource.data.visibility == 'team';
+      allow create: if isOperations() || ownSavedViewCreateAllowed();
+      allow update, delete: if isOperations() || ownSavedViewAllowed();
+    }
+
+    match /crm_assignment_rules/{docId} {
+      allow read: if isOperations();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /crm_automation_rules/{docId} {
+      allow read: if isOperations();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /crm_tasks/{docId} {
+      allow read: if isOperations() || resource.data.assignedTo == uid() || resource.data.createdBy == uid();
+      allow create: if isOperations();
+      allow update: if isOperations() || taskActorUpdateAllowed();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_notes/{docId} {
+      allow read: if isOperations() || resource.data.createdBy == uid() || resource.data.assignedTo == uid();
+      allow create: if isOperations();
+      allow update: if isOperations() || (resource.data.createdBy == uid() && onlyChanges(['title', 'body', 'visibility', 'pinned', 'updatedAt']));
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_messages/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_documents/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_attachments/{docId} {
+      allow read: if isOperations() || resource.data.uploadedBy == uid();
+      allow create: if isOperations() || request.resource.data.uploadedBy == uid();
+      allow update: if isOperations();
+      allow delete: if isAdminCore() || resource.data.uploadedBy == uid();
+    }
+
+    match /crm_files/{docId} {
+      allow read: if isOperations() || resource.data.uploadedBy == uid();
+      allow create: if isOperations() || request.resource.data.uploadedBy == uid();
+      allow update: if isOperations();
+      allow delete: if isAdminCore() || resource.data.uploadedBy == uid();
+    }
+
+    match /crm_activities/{docId} {
+      allow read: if isOperations() || resource.data.assignedTo == uid() || resource.data.createdBy == uid();
+      allow create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    // ------------------------------------------------------------
+    // Engagement workflow
+    // ------------------------------------------------------------
+    match /engagements/{docId} {
+      allow read: if isOperations() || isAssignedConsultant(resource.data) || isAssignedEditor(resource.data);
+      allow create: if isOperations();
+      allow update: if isOperations() || consultantEngagementUpdateAllowed() || editorEngagementUpdateAllowed();
+      allow delete: if isAdminCore();
+    }
+
+    // ------------------------------------------------------------
+    // Finance
+    // ------------------------------------------------------------
+    match /finance_accounts/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /finance_periods/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /share_rules/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /payments/{docId} {
+      allow read, create, update, delete: if isFinanceOps();
+    }
+
+    match /refunds/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /expenses/{docId} {
+      allow read, create, update, delete: if isFinanceOps();
+    }
+
+    match /finance_transactions/{docId} {
+      allow read, create, update, delete: if isFinanceOps();
+    }
+
+    match /finance_journal_entries/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /consultant_payouts/{docId} {
+      allow read: if isFinanceOps() || (signedIn() && resource.data.consultantId == uid());
+      allow create, update, delete: if isFinanceOps();
+    }
+
+    match /journal_entries/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /journal_lines/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    // ------------------------------------------------------------
+    // Notifications
+    // ------------------------------------------------------------
+    match /notifications/{docId} {
+      allow read: if isOperations() || (signedIn() && resource.data.user_id == uid());
+      allow create: if isOperations();
+      allow update: if isOperations() || ownNotificationUpdateAllowed();
+      allow delete: if isAdminCore() || (signedIn() && resource.data.user_id == uid());
+    }
+
+    match /notification_preferences/{docId} {
+      allow read: if isOperations() || (signedIn() && resource.data.user_id == uid());
+      allow create: if isOperations() || ownPreferenceCreateAllowed();
+      allow update: if isOperations() || ownPreferenceUpdateAllowed();
+      allow delete: if isOperations() || (signedIn() && resource.data.user_id == uid());
+    }
+
+    match /notification_templates/{docId} {
+      allow read: if isOperations();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /notification_logs/{docId} {
+      allow read, create: if isOperations();
+      allow update, delete: if isAdminCore();
+    }
+
+
+    // ------------------------------------------------------------
+    // Dynamically Sharded Collections Handler
+    // ------------------------------------------------------------
+    match /{collection}/{docId} {
+      
+      // Client Activities & Notes Shards
+      allow read: if collection.matches('^(clientActivities|clientNotes)-.*') && 
+        (isOperations() || (signedIn() && resource.data.isPublic == true && resource.data.user_id == uid()));
+      allow create, update: if collection.matches('^(clientActivities|clientNotes)-.*') && isOperations();
+      allow delete: if collection.matches('^(clientActivities|clientNotes)-.*') && isAdminCore();
+
+      // CRM Tasks & Activities Shards
+      allow read: if collection.matches('^(crm_tasks|crm_activities)-.*') && 
+        (isOperations() || resource.data.assignedTo == uid() || resource.data.createdBy == uid());
+      allow create: if collection.matches('^(crm_tasks|crm_activities)-.*') && isOperations();
+      allow update: if collection.matches('^crm_tasks-.*') && (isOperations() || taskActorUpdateAllowed());
+      allow update: if collection.matches('^crm_activities-.*') && isOperations();
+      allow delete: if collection.matches('^(crm_tasks|crm_activities)-.*') && isAdminCore();
+
+      // CRM Notes Shards
+      allow read: if collection.matches('^crm_notes-.*') && 
+        (isOperations() || resource.data.createdBy == uid() || resource.data.assignedTo == uid());
+      allow create: if collection.matches('^crm_notes-.*') && isOperations();
+      allow update: if collection.matches('^crm_notes-.*') && 
+        (isOperations() || (resource.data.createdBy == uid() && onlyChanges(['title', 'body', 'visibility', 'pinned', 'updatedAt'])));
+      allow delete: if collection.matches('^crm_notes-.*') && isAdminCore();
+
+      // CRM Messages, Documents, Attachments, Files Shards
+      allow read, create, update: if collection.matches('^(crm_messages|crm_documents)-.*') && isOperations();
+      allow delete: if collection.matches('^(crm_messages|crm_documents)-.*') && isAdminCore();
+      
+      allow read: if collection.matches('^(crm_attachments|crm_files)-.*') && 
+        (isOperations() || resource.data.uploadedBy == uid());
+      allow create: if collection.matches('^(crm_attachments|crm_files)-.*') && 
+        (isOperations() || request.resource.data.uploadedBy == uid());
+      allow update: if collection.matches('^(crm_attachments|crm_files)-.*') && isOperations();
+      allow delete: if collection.matches('^(crm_attachments|crm_files)-.*') && 
+        (isAdminCore() || resource.data.uploadedBy == uid());
+
+      // Engagements Shards
+      allow read: if collection.matches('^engagements-.*') && 
+        (isOperations() || isAssignedConsultant(resource.data) || isAssignedEditor(resource.data));
+      allow create: if collection.matches('^engagements-.*') && isOperations();
+      allow update: if collection.matches('^engagements-.*') && 
+        (isOperations() || consultantEngagementUpdateAllowed() || editorEngagementUpdateAllowed());
+      allow delete: if collection.matches('^engagements-.*') && isAdminCore();
+
+      // Finance & Ledger Shards
+      allow read, create, update, delete: if collection.matches('^(payments|expenses|finance_transactions)-.*') && isFinanceOps();
+      allow read, create, update: if collection.matches('^(refunds|finance_journal_entries|journal_entries|journal_lines)-.*') && isFinanceOps();
+      allow delete: if collection.matches('^(refunds|finance_journal_entries|journal_entries|journal_lines)-.*') && isAdminCore();
+      
+      allow read: if collection.matches('^consultant_payouts-.*') && 
+        (isFinanceOps() || (signedIn() && resource.data.consultantId == uid()));
+      allow create, update, delete: if collection.matches('^consultant_payouts-.*') && isFinanceOps();
+
+      // Notifications Shards
+      allow read: if collection.matches('^notifications-.*') && 
+        (isOperations() || (signedIn() && resource.data.user_id == uid()));
+      allow create: if collection.matches('^notifications-.*') && isOperations();
+      allow update: if collection.matches('^notifications-.*') && 
+        (isOperations() || ownNotificationUpdateAllowed());
+      allow delete: if collection.matches('^notifications-.*') && 
+        (isAdminCore() || (signedIn() && resource.data.user_id == uid()));
+
+      allow read, create: if collection.matches('^notification_logs-.*') && isOperations();
+      allow update, delete: if collection.matches('^notification_logs-.*') && isAdminCore();
+    }
+
+    // ------------------------------------------------------------
+    // Default deny
+    // ------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

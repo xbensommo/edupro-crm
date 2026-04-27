@@ -1,29 +1,24 @@
 /**
  * @file apps/dashboard/routes.js
- * @description Route contribution for the dashboard app.
- *
- * The generated router consumes these route records at build time.
- * This module stays declarative and does not mutate the router at runtime.
+ * @description Route contribution for the EduProLIC dashboard app.
  */
 
-/**
- * Build dashboard route records.
- *
- * @returns {import('vue-router').RouteRecordRaw[]}
- */
 export default function createDashboardRoutes() {
-  const localLazy = (view) => () => import(`./pages/${view}.vue`);
+  const localLazy = (view) => () => import(`./pages/${view}.vue`)
+  const dashboardRoles = ['admin', 'receptionist', 'consultant', 'consultant_editor', 'sysadmin']
+  const managementRoles = ['admin', 'receptionist', 'consultant_editor', 'sysadmin']
 
   return [
     {
-      path: '',
+      path: '/a',
       name: 'dashboard-home',
       component: localLazy('DashboardPage'),
       meta: {
         requiresAuth: true,
-        roles: ['admin', 'consultant', 'receptionist'],
-        permissions: ['dashboard:read'],
+        roles: dashboardRoles,
+        permissions: ['dashboard.overview.read'],
         title: 'Dashboard',
+        feature: 'dashboard',
       },
     },
     {
@@ -32,9 +27,10 @@ export default function createDashboardRoutes() {
       component: localLazy('AnalyticsPage'),
       meta: {
         requiresAuth: true,
-        roles: ['admin', 'consultant', 'receptionist'],
-        permissions: ['analytics:read'],
+        permissions: ['dashboard.analytics.read'],
         title: 'Analytics',
+        feature: 'dashboard',
+        roles: ['consultant', 'consultant_editor']
       },
     },
     {
@@ -43,10 +39,12 @@ export default function createDashboardRoutes() {
       component: localLazy('ReportsPage'),
       meta: {
         requiresAuth: true,
-        roles: ['admin', 'consultant', 'receptionist'],
-        permissions: ['reports:read'],
+        roles: managementRoles,
+        hideInNav: true,
+        permissions: ['dashboard.reports.read'],
         title: 'Reports',
+        feature: 'dashboard',
       },
     },
-  ];
+  ]
 }

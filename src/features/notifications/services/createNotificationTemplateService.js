@@ -4,45 +4,85 @@ import notificationEventRegistry from '../constants/notification.events.js';
 import { interpolateTemplate } from '../utils/notification.helpers.js';
 
 const BUILT_IN_TEMPLATES = Object.freeze({
-  'lead.created': {
-    key: 'lead.created',
-    title: 'New lead created',
-    body: '{{ actorName }} created lead {{ entityLabel }}.',
+  'client_record.created': {
+    key: 'client_record.created',
+    title: 'New client record created',
+    body: '{{ actorName }} created client record for {{ entityLabel }}.',
   },
-  'lead.assigned': {
-    key: 'lead.assigned',
-    title: 'Lead assigned to you',
-    body: '{{ actorName }} assigned {{ entityLabel }} to you.',
+  'client_record.updated': {
+    key: 'client_record.updated',
+    title: 'Client record updated',
+    body: '{{ actorName }} updated {{ entityLabel }}.',
   },
-  'booking.created': {
-    key: 'booking.created',
-    title: 'Booking received',
-    body: 'A new booking for {{ entityLabel }} was created.',
+  'crm.work.created': {
+    key: 'crm.work.created',
+    title: 'New work created',
+    body: '{{ actorName }} created work {{ entityLabel }} for {{ clientName }}.',
   },
-  'booking.confirmed': {
-    key: 'booking.confirmed',
-    title: 'Booking confirmed',
-    body: '{{ entityLabel }} has been confirmed for {{ customerName }}.',
+  'crm.work.assigned': {
+    key: 'crm.work.assigned',
+    title: 'New work assigned to you',
+    body: '{{ actorName }} assigned {{ entityLabel }} to you. Due: {{ dueDate }}.',
   },
-  'form.submitted': {
-    key: 'form.submitted',
-    title: 'New form submission',
-    body: '{{ entityLabel }} received a new submission.',
+  'crm.assignment.accepted': {
+    key: 'crm.assignment.accepted',
+    title: 'Assignment accepted',
+    body: '{{ actorName }} accepted {{ entityLabel }}.',
   },
-  'document.generated': {
-    key: 'document.generated',
-    title: 'Document generated',
-    body: '{{ entityLabel }} was generated successfully.',
+  'crm.assignment.denied': {
+    key: 'crm.assignment.denied',
+    title: 'Assignment denied',
+    body: '{{ actorName }} denied {{ entityLabel }} and it needs reassignment.',
   },
-  'user.role.changed': {
-    key: 'user.role.changed',
+  'crm.final_delivery.submitted': {
+    key: 'crm.final_delivery.submitted',
+    title: 'Final work submitted',
+    body: '{{ actorName }} submitted final delivery for {{ entityLabel }}.',
+  },
+  'crm.review.approved': {
+    key: 'crm.review.approved',
+    title: 'Work approved by editor',
+    body: '{{ actorName }} approved {{ entityLabel }}.',
+  },
+  'crm.review.denied': {
+    key: 'crm.review.denied',
+    title: 'Work returned for revision',
+    body: '{{ actorName }} returned {{ entityLabel }} for revision. Deduction: {{ deductionLabel }}.',
+  },
+  'finance.payment.logged': {
+    key: 'finance.payment.logged',
+    title: 'Client payment logged',
+    body: '{{ actorName }} logged payment of {{ amountPaid }} for {{ entityLabel }}.',
+  },
+  'finance.commission.ready': {
+    key: 'finance.commission.ready',
+    title: 'Commission ready',
+    body: 'Your commission for {{ entityLabel }} is ready. Amount: {{ amountDue }}.',
+  },
+  'finance.commission.deducted': {
+    key: 'finance.commission.deducted',
+    title: 'Commission deduction applied',
+    body: 'A deduction was applied to {{ entityLabel }}. Deduction: {{ deductionLabel }}.',
+  },
+  'finance.commission.paid': {
+    key: 'finance.commission.paid',
+    title: 'Commission paid',
+    body: 'Your commission for {{ entityLabel }} has been paid. Amount: {{ amountPaid }}.',
+  },
+  'auth.user.invited': {
+    key: 'auth.user.invited',
+    title: 'You were invited to EduProLIC',
+    body: '{{ actorName }} invited you to join EduProLIC as {{ roleName }}.',
+  },
+  'auth.user.suspended': {
+    key: 'auth.user.suspended',
+    title: 'Account suspended',
+    body: 'Your EduProLIC access has been suspended. Contact admin if this is unexpected.',
+  },
+  'auth.role.changed': {
+    key: 'auth.role.changed',
     title: 'Role updated',
     body: 'Your role was changed to {{ roleName }}.',
-  },
-  'invoice.overdue': {
-    key: 'invoice.overdue',
-    title: 'Invoice overdue',
-    body: '{{ entityLabel }} is overdue. Amount due: {{ amountDue }}.',
   },
   'system.alert': {
     key: 'system.alert',
@@ -51,18 +91,6 @@ const BUILT_IN_TEMPLATES = Object.freeze({
   },
 });
 
-/**
- * Create a notification template resolver.
- *
- * @param {{
- *   templates?: Array<Record<string, any>>,
- *   eventRegistry?: Record<string, Record<string, any>>,
- * }} [options={}]
- * @returns {{
- *   getTemplate: (event: string) => Record<string, any>,
- *   renderTemplate: (event: string, variables?: Record<string, unknown>) => { title: string, body: string, definition: Record<string, any> },
- * }}
- */
 export function createNotificationTemplateService(options = {}) {
   const templates = options.templates || [];
   const eventRegistry = options.eventRegistry || notificationEventRegistry;

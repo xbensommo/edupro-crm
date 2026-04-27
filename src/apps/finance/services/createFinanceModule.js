@@ -1,32 +1,28 @@
 /**
  * @file src/apps/finance/services/createFinanceModule.js
- * @description High-level finance module assembly.
+ * @description High-level EduProLIC finance module assembly.
  */
 
 import { createFinanceRepositories } from './createFinanceRepositories.js'
 import { createFinanceCommandBus } from './createFinanceCommandBus.js'
+import { createFinanceConfirmHandler } from './financeConfirmAdapter.js'
 import * as reportService from './financeReportService.js'
+import * as queryPresets from './financeQueryPresets.js'
+import * as metricService from './financeOperationalMetrics.js'
 
-/**
- * Assemble the finance module for Totistack runtime.
- *
- * @param {object} options
- * @param {object} options.shardProvider
- * @param {() => ({ id?: string, roles?: string[] } | null)} options.getCurrentUser
- * @param {(context: { title: string, message: string, confirmText: string, tone?: string }) => Promise<boolean>} options.confirm
- * @returns {{ repositories: object, commands: object, reports: typeof reportService }}
- */
-export function createFinanceModule({ shardProvider, getCurrentUser, confirm }) {
-  const repositories = createFinanceRepositories({ shardProvider })
+export function createFinanceModule({ shardProvider = null, hostStore = null, getCurrentUser, confirm }) {
+  const repositories = createFinanceRepositories({ shardProvider, hostStore })
   const commands = createFinanceCommandBus({
     repositories,
     getCurrentUser,
-    confirm,
+    confirm: confirm || createFinanceConfirmHandler(hostStore),
   })
 
   return {
     repositories,
     commands,
+    queries: queryPresets,
+    metrics: metricService,
     reports: reportService,
   }
 }

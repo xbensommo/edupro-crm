@@ -11,7 +11,10 @@ import { createPostedJournalEntry } from './financePostingEngine.js'
  *   accounts: Array<object>,
  *   transactions: Array<object>,
  *   journalEntries: Array<object>,
- *   periods: Array<object>
+ *   periods: Array<object>,
+ *   invoices: Array<object>,
+ *   paymentAllocations: Array<object>,
+ *   auditLogs: Array<object>
  * }}
  */
 export function buildFinanceDemoState() {
@@ -278,10 +281,72 @@ export function buildFinanceDemoState() {
     },
   ]
 
+  const invoices = [
+    {
+      id: 'inv_001',
+      invoiceCode: 'INV-2026-001',
+      clientId: 'client_001',
+      clientLabel: 'Solveit Insurance Brokers',
+      engagementId: 'eng_001',
+      engagementCode: 'EDU-2026-001',
+      status: 'paid',
+      issueDate: '2026-01-03T00:00:00.000Z',
+      dueDate: '2026-01-20T00:00:00.000Z',
+      currency: 'NAD',
+      subtotalAmount: 16000,
+      discountAmount: 0,
+      taxAmount: 0,
+      totalAmount: 16000,
+      allocatedAmount: 16000,
+      paidAmount: 16000,
+      balanceAmount: 0,
+      lineItems: [{ description: 'Website design milestone', quantity: 1, unitPrice: 16000, totalAmount: 16000 }],
+      financeTransactionId: 'txn_001',
+      postedJournalEntryId: 'je_001',
+      createdByUserId: 'admin_001',
+    },
+    {
+      id: 'inv_002',
+      invoiceCode: 'INV-2026-014',
+      clientId: 'client_002',
+      clientLabel: 'Kaufi Pro Organics',
+      engagementId: 'eng_014',
+      engagementCode: 'EDU-2026-014',
+      status: 'partially_paid',
+      issueDate: '2026-02-08T00:00:00.000Z',
+      dueDate: '2026-02-28T00:00:00.000Z',
+      currency: 'NAD',
+      subtotalAmount: 12000,
+      discountAmount: 0,
+      taxAmount: 0,
+      totalAmount: 12000,
+      allocatedAmount: 9000,
+      paidAmount: 9000,
+      balanceAmount: 3000,
+      lineItems: [{ description: 'Ecommerce rollout stage two', quantity: 1, unitPrice: 12000, totalAmount: 12000 }],
+      financeTransactionId: 'txn_003',
+      postedJournalEntryId: 'je_003',
+      createdByUserId: 'admin_001',
+    },
+  ]
+
+  const paymentAllocations = [
+    { id: 'alloc_001', allocationCode: 'ALLOC-2026-001', paymentId: 'pay_001', paymentCode: 'PAY-2026-001', invoiceId: 'inv_001', invoiceCode: 'INV-2026-001', clientId: 'client_001', engagementId: 'eng_001', amount: 16000, currency: 'NAD', allocatedAt: '2026-01-05T10:10:00.000Z', allocatedByUserId: 'admin_001', status: 'active' },
+    { id: 'alloc_002', allocationCode: 'ALLOC-2026-002', paymentId: 'pay_002', paymentCode: 'PAY-2026-002', invoiceId: 'inv_002', invoiceCode: 'INV-2026-014', clientId: 'client_002', engagementId: 'eng_014', amount: 9000, currency: 'NAD', allocatedAt: '2026-02-12T09:15:00.000Z', allocatedByUserId: 'admin_001', status: 'active' },
+  ]
+
+  const auditLogs = [
+    { id: 'aud_001', auditCode: 'AUD-2026-001', action: 'invoice.issue', entityType: 'invoice', entityId: 'inv_001', entityLabel: 'INV-2026-001', outcome: 'success', actorId: 'admin_001', actorName: 'Finance Admin', occurredAt: '2026-01-03T08:00:00.000Z', sourceModule: 'finance' },
+    { id: 'aud_002', auditCode: 'AUD-2026-002', action: 'transaction.post', entityType: 'finance_transaction', entityId: 'txn_001', entityLabel: 'INV-2026-001', outcome: 'success', actorId: 'admin_001', actorName: 'Finance Admin', occurredAt: '2026-01-05T10:00:00.000Z', sourceModule: 'finance' },
+  ]
+
   return {
     accounts,
     transactions: transactionsWithLinks,
     journalEntries,
     periods,
+    invoices,
+    paymentAllocations,
+    auditLogs,
   }
 }

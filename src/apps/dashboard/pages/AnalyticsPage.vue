@@ -1,42 +1,42 @@
 <template>
   <DashboardPageShell
     eyebrow="Insights"
-    title="Analytics"
-    description="Operational trends derived from the generated collection registry and any loaded project data."
+    :title="title"
+    :description="description"
   >
     <MetricsWidget :cards="metrics.cards" />
-    <ChartsWidget :charts="charts" />
   </DashboardPageShell>
 </template>
 
 <script setup>
-/**
- * @file apps/dashboard/pages/AnalyticsPage.vue
- * @description Analytics starter page for the dashboard app.
- */
+import { computed, onMounted, reactive, ref } from 'vue'
+import DashboardPageShell from '../components/DashboardPageShell.vue'
+import MetricsWidget from '../components/MetricsWidget.vue'
+import { useDashboardService } from '../services/dashboardService.js'
 
-import { onMounted, reactive } from 'vue';
-import DashboardPageShell from '../components/DashboardPageShell.vue';
-import MetricsWidget from '../components/MetricsWidget.vue';
-import ChartsWidget from '../components/ChartsWidget.vue';
-import { useDashboardService } from '../services/dashboardService.js';
+const dashboardService = useDashboardService()
+const roleContext = dashboardService.roleContext
+const metrics = reactive({ cards: [] })
+const charts = reactive({})
 
-const dashboardService = useDashboardService();
-
-const metrics = reactive({ cards: [] });
-const charts = reactive({});
+const title = computed(() => roleContext.value === 'consultant' ? 'My Analytics' : roleContext.value === 'consultant_editor' ? 'Editorial Analytics' : 'Operational Analytics')
+const description = computed(() => roleContext.value === 'consultant'
+  ? 'Personal assignment and submission trends only.'
+  : roleContext.value === 'consultant_editor'
+    ? 'Editorial throughput and review-related trends.'
+    : 'Cross-module work, notification, and operations trends.')
 
 async function loadAnalytics() {
   const [metricData, chartData] = await Promise.all([
     dashboardService.getOverviewMetrics(),
     dashboardService.getChartData(),
-  ]);
+  ])
 
-  Object.assign(metrics, metricData);
-  Object.assign(charts, chartData);
+  Object.assign(metrics, metricData)
+  Object.assign(charts, chartData)
 }
 
 onMounted(() => {
-  loadAnalytics().catch(console.error);
-});
+  loadAnalytics().catch(console.error)
+})
 </script>

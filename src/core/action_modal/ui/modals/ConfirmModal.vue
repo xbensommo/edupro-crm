@@ -92,7 +92,7 @@ if (!modalStore) {
 }
 
 const typedText = ref('');
-const state = modalStore.state;
+const state = modalStore.state; 
 
 const isOpen = computed(() => Boolean(state.value?.isOpen));
 const request = computed(() => state.value?.request || null);

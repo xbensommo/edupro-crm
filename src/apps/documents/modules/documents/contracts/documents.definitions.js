@@ -7,7 +7,7 @@ import { FIELD_TYPES, defineCollection } from '@xbensommo/shard-provider';
  */
 export const documentsCollection = defineCollection({
   name: 'documents',
-  shard: { type: 'monthly' },
+  shard: { type: 'none' },
   timestamps: true,
   softDelete: true,
   schema: {

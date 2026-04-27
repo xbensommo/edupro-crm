@@ -1,13 +1,8 @@
 /**
  * @file routes.js
- * @description Declarative routes for the Client Records app.
+ * @description Declarative routes for the EduProLIC Client Records app.
  */
 
-/**
- * Build Client Records route records.
- *
- * @returns {import('vue-router').RouteRecordRaw[]}
- */
 export default function createClientRecordRoutes() {
   return [
     {
@@ -16,8 +11,8 @@ export default function createClientRecordRoutes() {
       component: () => import('./pages/ClientsListPage.vue'),
       meta: {
         requiresAuth: true,
-        roles: ['admin', 'receptionist', 'consultant'],
-        permissions: ['clients.read'],
+        roles: ['admin', 'receptionist', 'consultant_editor'],
+        permissions: ['client_records.clients.read'],
         feature: 'client-records',
         title: 'Client Records',
       },
@@ -29,7 +24,7 @@ export default function createClientRecordRoutes() {
       meta: {
         requiresAuth: true,
         roles: ['admin', 'receptionist'],
-        permissions: ['clients.create'],
+        permissions: ['client_records.clients.create'],
         feature: 'client-records',
         title: 'Create Client',
       },
@@ -40,8 +35,8 @@ export default function createClientRecordRoutes() {
       component: () => import('./pages/ClientDetailPage.vue'),
       meta: {
         requiresAuth: true,
-        roles: ['admin', 'receptionist', 'consultant'],
-        permissions: ['clients.read'],
+        roles: ['admin', 'receptionist', 'finance_officer'],
+        permissions: ['client_records.clients.read'],
         feature: 'client-records',
         title: 'Client Detail',
       },
@@ -53,22 +48,10 @@ export default function createClientRecordRoutes() {
       meta: {
         requiresAuth: true,
         roles: ['admin', 'receptionist'],
-        permissions: ['clients.update'],
+        permissions: ['client_records.clients.update'],
         feature: 'client-records',
         title: 'Edit Client',
       },
     },
-    /* {
-      path: '/clients/:id/add/activitysd',
-      name: 'ClientAddActitity',
-      component: () => import('./pages/CreateActivityPage.vue'),
-      meta: {
-        requiresAuth: true,
-        roles: ['admin', 'manager'],
-        permissions: ['clients.update'],
-        feature: 'client-records',
-        title: 'Add Client Activity',
-      },
-    } */,
   ]
 }

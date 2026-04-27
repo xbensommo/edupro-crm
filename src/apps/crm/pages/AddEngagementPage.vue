@@ -10,7 +10,6 @@
           <span class="badge" :class="{ 'opacity-70': !form.clientId }">
             {{ selectedClientLabel || 'No client selected' }}
           </span>
-          <span v-if="currentUserId" class="badge">Actor: {{ currentUserId }}</span>
         </div>
       </div>
     </template>
@@ -162,7 +161,7 @@
               <span class="field-label mb-0">Service type</span>
               <select v-model="form.serviceType" class="select-field" required>
                 <option value="">Select service</option>
-                <option value="application">Application</option>
+                <option value="proof reading">proof reading</option>
                 <option value="assignment">Assignment</option>
                 <option value="research">Research</option>
                 <option value="proposal">Proposal</option>
@@ -266,7 +265,7 @@
                 <option
                   v-for="consultant in consultantsList"
                   :key="getRecordId(consultant)"
-                  :value="getRecordId(consultant)"
+                  :value="assignConsultant(consultant)"
                 >
                   {{ consultantDisplayName(consultant) }}
                 </option>
@@ -275,12 +274,12 @@
 
             <label class="grid gap-2">
               <span class="field-label mb-0">Start date</span>
-              <input v-model="form.startDate" class="input-field" type="date" />
+              <input v-model="form.startDate" class="input-field" :min="minDate" type="date" />
             </label>
 
             <label class="grid gap-2">
               <span class="field-label mb-0">Due date</span>
-              <input v-model="form.dueDate" class="input-field" type="date" />
+              <input v-model="form.dueDate" :min="minDate" class="input-field" type="date" />
             </label>
           </div>
         </section>
@@ -298,17 +297,17 @@
           <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label class="grid gap-2">
               <span class="field-label mb-0">Quoted amount</span>
-              <input v-model="form.quotedAmount" class="input-field" inputmode="decimal" />
+              <input v-model="form.quotedAmount" class="input-field" type="number" min="0" inputmode="decimal" />
             </label>
 
             <label class="grid gap-2">
               <span class="field-label mb-0">Discount</span>
-              <input v-model="form.discountAmount" class="input-field" inputmode="decimal" />
+              <input v-model="form.discountAmount" class="input-field" type="number" inputmode="decimal" />
             </label>
 
             <label class="grid gap-2">
-              <span class="field-label mb-0">Paid</span>
-              <input v-model="form.amountPaidCached" class="input-field" inputmode="decimal" />
+              <span class="field-label mb-0">Received</span>
+              <input v-model="form.amountPaidCached" class="input-field" type="number" min="0" inputmode="decimal" />
             </label>
 
             <label class="grid gap-2">
@@ -393,7 +392,7 @@
                 <select v-model="defaultFileCategory" class="select-field">
                   <option value="supporting_document">Supporting document</option>
                   <option value="source_material">Source material</option>
-                  <option value="proof_of_payment">Proof of payment</option>
+                  <!-- <option value="proof_of_payment">Proof of payment</option> -->
                   <option value="brief">Brief</option>
                   <option value="final_delivery">Final delivery</option>
                   <option value="revision">Revision</option>
@@ -410,7 +409,7 @@
             </p>
           </div>
 
-          <div v-if="queuedFiles.length" class="grid gap-3">
+          <div v-if="queuedFiles.length" class="grid gap-3 relative">
             <article
               v-for="item in queuedFiles"
               :key="item.localId"
@@ -418,7 +417,7 @@
             >
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="truncate font-semibold text-[var(--color-secondary)]">
+                  <p class="truncate word-wrap text-wrap font-semibold text-[var(--color-secondary)]">
                     {{ item.file.name }}
                   </p>
                   <p class="text-sm text-[var(--color-text-soft)]">
@@ -619,27 +618,20 @@ import {
 import { useAppStore } from '@app/stores/appStore/index.js'
 import {
   useCrmService,
-  ALLOWED_EXTENSIONS,
-  ALLOWED_MIME_TYPES,
 } from '../services/crmService.js'
+import CrmPageShell from '../components/CrmPageShell.vue'
 
 import {
   roundMoney,
   getRecordId,
+  MAX_FILE_COUNT, MAX_TOTAL_SIZE_BYTES,
+  acceptedFileTypes, sanitizeFilename,
+  validateFile, createStoragePath
 } from '@core_services/index.js'
-
-import CrmPageShell from '../components/CrmPageShell.vue'
 
 const { service } = useCrmService()
 const route = useRoute()
 const store = useAppStore()
-
-const MAX_FILE_COUNT = 5
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
-const MAX_TOTAL_SIZE_BYTES = 25 * 1024 * 1024
-
-const acceptedFileTypes =
-  '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg'
 
 const submitting = ref(false)
 const errorMessage = ref('')
@@ -649,18 +641,24 @@ const queuedFiles = ref([])
 const fileInputRef = ref(null)
 const defaultFileCategory = ref('supporting_document')
 
+const minDate = computed(() => getLocalDateString(new Date));
+
 const currentUser = computed(() => unref(store.currentUser) || null)
 const currentUserId = computed(() => currentUser.value?.uid || currentUser.value?.id || null)
 
 const form = reactive({
   engagementCode: service.createEngagementCode(),
   clientId: '',
+  clientName: '',
+  clientEmail: '',
+  clientPhone: '',
   title: '',
   serviceType: '',
   description: '',
   studyLevel: '',
   institutionName: '',
   assignedConsultantId: '',
+  assignedConsultantInfo: '',
   assignedTeam: '',
   priority: 'medium',
   status: 'draft',
@@ -699,18 +697,9 @@ const clients = computed(() => getCollectionItems('clients'));
 
 const consultantsList = computed(() =>  store.users.items )
 
-
-/* const consultantsList = computed(() => {
-  return consultantsFiltered.filter( (user) => {
-    const roles = Array.isArray(user.data) ? user.data.roles : [];
-    const role = String(user.data.role || '').toLowerCase();
-    return roles.includes('consultant') || role === 'consultant' || !roles.length
-  })
-})
- */
 const uploadedFiles = computed(() => {
   const items = getCollectionItems('crm_files')
-    .map((entry) => ({ ...recordData(entry), id: getRecordId(entry) || recordData(entry).id }))
+    .map((entry) => ({ ...recordData(entry), id: getRecordId(entry) || entry.id }))
     .filter((entry) => !form.clientId || entry.clientId === form.clientId)
 
   return items.sort((a, b) => {
@@ -773,17 +762,14 @@ const filteredClients = computed(() => {
     .slice(0, 24)
 })
 
-const quotedAmountValue = computed(() => service.asMoney(form.quotedAmount))
-const discountAmountValue = computed(() => service.asMoney(form.discountAmount))
-const amountPaidValue = computed(() => service.asMoney(form.amountPaidCached))
-const amountRefundedValue = computed(() => service.asMoney(0))
+const amountRefundedValue = ref(0)
 
 const netAmount = computed(() =>
-  Math.max(quotedAmountValue.value - discountAmountValue.value, 0),
+  Math.max(form.quotedAmount - form.discountAmount, 0),
 )
 
 const amountDue = computed(() =>
-  Math.max(netAmount.value - amountPaidValue.value + amountRefundedValue.value, 0),
+  Math.max(netAmount.value - form.amountPaidCached + form.amountRefundedCached, 0),
 )
 
 const consultantShare = computed(() => roundMoney(netAmount.value * 0.6))
@@ -798,9 +784,14 @@ const canSubmit = computed(() => {
   )
 })
 
-function consultantDisplayName(consultant) {
-  const data = recordData(consultant)
-  return [data.firstName, data.lastName].filter(Boolean).join(' ') || data.displayName || data.email || getRecordId(consultant)
+function consultantDisplayName(usr) {
+  let { data } = usr;
+  return [data.firstName, data.lastName].filter(Boolean).join(' ') || data.displayName || data.email;
+}
+
+function assignConsultant(usr){
+  form.assignedConsultantInfo = `${usr.data.firstName} ${usr.data.lastName}`;
+  return usr.id;
 }
 
 function resolveStorage() {
@@ -827,39 +818,6 @@ function regenerateCode() {
 function getFileExtension(name = '') {
   const parts = String(name).toLowerCase().split('.')
   return parts.length > 1 ? parts.pop() : ''
-}
-
-function sanitizeFilename(name = '') {
-  const extension = getFileExtension(name)
-  const baseName = String(name)
-    .replace(/\.[^/.]+$/, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 80)
-
-  return extension ? `${baseName || 'file'}.${extension}` : baseName || 'file'
-}
-
-function validateFile(file) {
-  const extension = getFileExtension(file?.name)
-  const hasAllowedExtension = ALLOWED_EXTENSIONS.has(extension)
-  const hasAllowedMime = !file?.type || ALLOWED_MIME_TYPES.has(file.type)
-
-  if (!hasAllowedExtension) {
-    return { ok: false, reason: 'Blocked file extension.' }
-  }
-
-  if (!hasAllowedMime) {
-    return { ok: false, reason: 'Blocked file type.' }
-  }
-
-  if (Number(file?.size || 0) > MAX_FILE_SIZE_BYTES) {
-    return { ok: false, reason: 'File is above 10 MB.' }
-  }
-
-  return { ok: true, reason: '' }
 }
 
 function clearQueuedFiles() {
@@ -925,12 +883,6 @@ function onFileInputChange(event) {
   event.target.value = ''
 }
 
-function createStoragePath({ clientId, engagementId, safeName }) {
-  const stamp = Date.now()
-  const random = Math.random().toString(36).slice(2, 8)
-  return `crm/engagements/${clientId}/${engagementId}/${stamp}_${random}_${safeName}`
-}
-
 async function refreshFiles() {
   try {
     await service.fetchRecentFiles()
@@ -941,6 +893,9 @@ async function refreshFiles() {
 
 async function selectClient(client) {
   form.clientId = getRecordId(client)
+  form.clientEmail = `${client.data?.email}`;
+  form.clientPhone = `${client.data?.phone}`;
+  form.clientName = `${client.data.firstName} ${client.data.lastName}`;
   const data = recordData(client)
 
   if (!form.institutionName && data?.institutionName) {
@@ -975,6 +930,7 @@ function prefillFromRoute() {
 
   if (!form.assignedConsultantId && currentUserId.value) {
     form.assignedConsultantId = currentUserId.value
+    
   }
 }
 
@@ -1113,7 +1069,7 @@ function resetForm(keepClient = false) {
   clearQueuedFiles()
 }
 
-async function submitEngagement() {
+ async function submitEngagement() {
   submitting.value = true
   errorMessage.value = ''
   successMessage.value = ''
@@ -1125,15 +1081,21 @@ async function submitEngagement() {
 
     const payload = {
       ...form,
-      quotedAmount: quotedAmountValue.value,
-      discountAmount: discountAmountValue.value,
-      amountPaidCached: amountPaidValue.value,
-      amountRefundedCached: amountRefundedValue.value,
+  
       netAmountCached: netAmount.value,
       amountDueCached: amountDue.value,
       consultantShareCached: consultantShare.value,
       companyShareCached: companyShare.value,
-      assignedBy: currentUserId.value,
+      fileUrls: [],
+      files: [],
+      assignmentRespondedAt: '',
+      assignmentRespondedBy: '',
+      assignmentRespondedByName: '',
+      assignmentStatus: form.assignedConsultantId ? 'pending' : 'unassigned',
+      assignedBy: {
+        uid: currentUserId.value,
+        fullName: `${store.currentUser.firstName} ${store.currentUser.lastName}`,
+      },
     }
 
     const engagementCode = form.engagementCode
@@ -1145,6 +1107,32 @@ async function submitEngagement() {
     }
 
     const uploadSummary = await uploadQueuedFiles(engagementId)
+
+    const uploadedFilesPayload = uploadSummary.uploaded.map((file) => ({
+      id: file?.id || null,
+      name: file?.name || file?.originalName || '',
+      originalName: file?.originalName || file?.name || '',
+      url: file?.url || '',
+      storagePath: file?.storagePath || '',
+      category: file?.category || 'supporting_document',
+      fileType: file?.fileType || '',
+      clientId: file?.clientId || form.clientId,
+      engagementId,
+      uploadedBy: file?.uploadedBy || currentUserId.value || null,
+    }))
+
+    const uploadedFileUrls = uploadedFilesPayload
+      .map((file) => file.url)
+      .filter(Boolean)
+
+    // const engagementsActions = requireCollectionActions('engagements')
+    
+    await store.engagementsActions.update(engagementId, {
+      fileUrls: uploadedFileUrls,
+      files: uploadedFilesPayload,
+      attachmentsCount: uploadedFilesPayload.length,
+      hasAttachments: uploadedFilesPayload.length > 0,
+    })
 
     await Promise.allSettled([
       service.fetchRecentEngagements?.(),
@@ -1183,4 +1171,18 @@ onMounted(async () => {
   await store.usersActions.fetchInitialPage({ filters: {role: 'consultant', status: 'active' } })
   await loadPage()
 })
+
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  return `${year}-${month}-${day}`;
+};
+
+const getLocalTimeString = (date = new Date()) => {
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${hours}:${minutes}`;
+};
+const pad = (value) => String(value).padStart(2, '0');
 </script>

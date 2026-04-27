@@ -20,45 +20,68 @@ const manifestImports = import.meta.glob(
   { eager: true },
 )
 
+/**
+ * Determine whether a value is a real shard-provider collection definition.
+ *
+ * Important:
+ * - Do not treat schema field configs like `{ name: 'title', type: 'string' }`
+ *   as collection definitions.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
 function isCollectionDefinition(value) {
   return Boolean(
     value &&
       typeof value === 'object' &&
+      value.kind === 'ShardProviderCollectionDefinition' &&
       typeof value.name === 'string' &&
-      value.name.trim().length > 0,
+      value.name.trim().length > 0 &&
+      value.schema &&
+      typeof value.schema === 'object'
   )
 }
 
+/**
+ * Extract only top-level exported collection definitions from a module.
+ *
+ * This intentionally does NOT walk nested objects, because nested schema fields
+ * also contain `name` and would be falsely detected as collection definitions.
+ *
+ * @param {string} modulePath
+ * @param {Record<string, any>} mod
+ * @returns {Array<Record<string, any>>}
+ */
 function extractDefinitionsFromModule(modulePath, mod) {
   const extracted = []
+  const seenNames = new Set()
 
-  if (isCollectionDefinition(mod?.default)) {
-    extracted.push(mod.default)
-  } else if (mod?.default && typeof mod.default === 'object') {
-    for (const value of Object.values(mod.default)) {
-      if (isCollectionDefinition(value)) {
-        extracted.push(value)
-      }
-    }
+  function pushDefinition(value) {
+    if (!isCollectionDefinition(value)) return
+
+    const normalizedName = value.name.trim()
+    if (seenNames.has(normalizedName)) return
+
+    seenNames.add(normalizedName)
+    extracted.push(value)
   }
+
+  pushDefinition(mod?.default)
 
   for (const [exportName, value] of Object.entries(mod)) {
     if (exportName === 'default') continue
-
-    if (isCollectionDefinition(value)) {
-      extracted.push(value)
-    } else if (value && typeof value === 'object') {
-      for (const nestedValue of Object.values(value)) {
-        if (isCollectionDefinition(nestedValue)) {
-          extracted.push(nestedValue)
-        }
-      }
-    }
+    pushDefinition(value)
   }
 
   return extracted
 }
 
+/**
+ * Extract collection names declared in manifests.
+ *
+ * @param {Record<string, any>} manifest
+ * @returns {string[]}
+ */
 function extractManifestCollectionNames(manifest) {
   const collections = Array.isArray(manifest?.collections) ? manifest.collections : []
 
@@ -73,6 +96,11 @@ function extractManifestCollectionNames(manifest) {
     .filter(Boolean)
 }
 
+/**
+ * Build the generated collection registry.
+ *
+ * @returns {{ definitions: Array<Record<string, any>>, names: string[] }}
+ */
 function buildCollectionRegistry() {
   const definitions = []
   const definitionNames = new Map()
@@ -118,6 +146,24 @@ function buildCollectionRegistry() {
 }
 
 const registry = buildCollectionRegistry()
+
+const notificationsDefinition = registry.definitions.find(
+  (definition) => definition?.name === 'notifications',
+)
+
+if (!notificationsDefinition) {
+  throw new Error(
+    '[generated/collections] Missing "notifications" collection definition in generated registry.',
+  )
+}
+
+/* console.log('[generated/collections] notifications definition', {
+  name: notificationsDefinition.name,
+  writableFields: notificationsDefinition.writableFields,
+  updateableFields: notificationsDefinition.updateableFields,
+  fieldAliases: notificationsDefinition.fieldAliases,
+  schemaKeys: Object.keys(notificationsDefinition.schema || {}),
+}) */
 
 export const definedCollections = registry.definitions
 export const generatedCollectionNames = registry.names

@@ -18,26 +18,12 @@ export default defineConfig({
       '@core': path.resolve(__dirname, './src/core'),
       '@modules': path.resolve(__dirname, './src/apps'),
       '@core_services': path.resolve(__dirname, './src/core/services'),
+      '@core_utils': path.resolve(__dirname, './src/core/utils'),
       '@features': path.resolve(__dirname, './src/features'),
       '@generated': path.resolve(__dirname, './src/generated'),
       '@shared': path.resolve(__dirname, './src/shared'),
       '@config': path.resolve(__dirname, './src/config'),
       '@action_modal': path.resolve(__dirname, './src/core/action_modal'),
-    },
-  },
-  ssgOptions: {
-    formatting: 'minify',
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['vue', 'vue-router', 'pinia'],
-          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
-        },
-      },
     },
   },
 });

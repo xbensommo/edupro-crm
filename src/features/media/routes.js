@@ -4,15 +4,27 @@
  */
 export default [
   {
-    path: '/admin/media',
+    path: '/system/files',
     name: 'MediaLibrary',
     component: () => import('./pages/MediaLibraryPage.vue'),
-    meta: { requiresAuth: true, feature: 'media', permissions: ['media.view'], title: 'Media Library' },
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'receptionist', 'consultant', 'consultant_editor', 'sysadmin'],
+      feature: 'media',
+      permissions: ['media.view'],
+      title: 'System files',
+    },
   },
   {
-    path: '/admin/media/upload',
+    path: '/system/files/upload',
     name: 'MediaUpload',
     component: () => import('./pages/MediaUploadPage.vue'),
-    meta: { requiresAuth: true, feature: 'media', permissions: ['media.manage'], title: 'Upload Media' },
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'receptionist', 'consultant', 'consultant_editor', 'sysadmin'],
+      feature: 'media',
+      permissions: ['media.manage'],
+      title: 'Upload system files',
+    },
   },
 ]

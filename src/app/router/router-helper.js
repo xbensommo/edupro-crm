@@ -2,7 +2,6 @@
  * @file router-helper.js
  * @description Shared enterprise router helpers and route guards for Totistack Vue projects.
  */
-import { useHead } from '@unhead/vue'
 import accessConfig from '@config/access.config.js'
 
 const defaults = {
@@ -283,9 +282,6 @@ export function installEnterpriseRouterGuards(
     const title = rawTitle
       ? `${rawTitle} | ${config.appName}`
       : config.appName
-
-    useHead({ title })
-
     if (
       !import.meta.env.SSR &&
       window.gtag &&

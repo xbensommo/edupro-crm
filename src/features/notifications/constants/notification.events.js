@@ -5,56 +5,107 @@ import { NOTIFICATION_PRIORITIES } from './notification.statuses.js';
 import { NOTIFICATION_TYPES } from './notification.types.js';
 
 /**
- * Event definitions consumed by the orchestrator.
+ * EduProLIC-focused event registry.
+ *
+ * Other Totistack features should emit these domain events instead of talking
+ * directly to email, WhatsApp, or in-app delivery code.
  */
 export const notificationEventRegistry = Object.freeze({
-  'lead.created': {
+  'client_record.created': {
+    type: NOTIFICATION_TYPES.CLIENT_RECORDS,
+    channels: [NOTIFICATION_CHANNELS.IN_APP],
+    priority: NOTIFICATION_PRIORITIES.NORMAL,
+    templateKey: 'client_record.created',
+  },
+  'client_record.updated': {
+    type: NOTIFICATION_TYPES.CLIENT_RECORDS,
+    channels: [NOTIFICATION_CHANNELS.IN_APP],
+    priority: NOTIFICATION_PRIORITIES.NORMAL,
+    templateKey: 'client_record.updated',
+  },
+  'crm.work.created': {
     type: NOTIFICATION_TYPES.CRM,
     channels: [NOTIFICATION_CHANNELS.IN_APP],
     priority: NOTIFICATION_PRIORITIES.NORMAL,
-    templateKey: 'lead.created',
+    templateKey: 'crm.work.created',
   },
-  'lead.assigned': {
-    type: NOTIFICATION_TYPES.CRM,
+  'crm.work.assigned': {
+    type: NOTIFICATION_TYPES.WORKFLOW,
     channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
     priority: NOTIFICATION_PRIORITIES.HIGH,
-    templateKey: 'lead.assigned',
+    templateKey: 'crm.work.assigned',
   },
-  'booking.created': {
-    type: NOTIFICATION_TYPES.BOOKING,
+  'crm.assignment.accepted': {
+    type: NOTIFICATION_TYPES.WORKFLOW,
     channels: [NOTIFICATION_CHANNELS.IN_APP],
-    priority: NOTIFICATION_PRIORITIES.NORMAL,
-    templateKey: 'booking.created',
+    priority: NOTIFICATION_PRIORITIES.HIGH,
+    templateKey: 'crm.assignment.accepted',
   },
-  'booking.confirmed': {
-    type: NOTIFICATION_TYPES.BOOKING,
+  'crm.assignment.denied': {
+    type: NOTIFICATION_TYPES.WORKFLOW,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.HIGH,
+    templateKey: 'crm.assignment.denied',
+  },
+  'crm.final_delivery.submitted': {
+    type: NOTIFICATION_TYPES.WORKFLOW,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.HIGH,
+    templateKey: 'crm.final_delivery.submitted',
+  },
+  'crm.review.approved': {
+    type: NOTIFICATION_TYPES.WORKFLOW,
+    channels: [NOTIFICATION_CHANNELS.IN_APP],
+    priority: NOTIFICATION_PRIORITIES.HIGH,
+    templateKey: 'crm.review.approved',
+  },
+  'crm.review.denied': {
+    type: NOTIFICATION_TYPES.WORKFLOW,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.CRITICAL,
+    templateKey: 'crm.review.denied',
+  },
+  'finance.payment.logged': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP],
+    priority: NOTIFICATION_PRIORITIES.HIGH,
+    templateKey: 'finance.payment.logged',
+  },
+  'finance.commission.ready': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.HIGH,
+    templateKey: 'finance.commission.ready',
+  },
+  'finance.commission.deducted': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.CRITICAL,
+    templateKey: 'finance.commission.deducted',
+  },
+  'finance.commission.paid': {
+    type: NOTIFICATION_TYPES.FINANCE,
     channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL, NOTIFICATION_CHANNELS.WHATSAPP],
     priority: NOTIFICATION_PRIORITIES.HIGH,
-    templateKey: 'booking.confirmed',
+    templateKey: 'finance.commission.paid',
   },
-  'form.submitted': {
-    type: NOTIFICATION_TYPES.FORMS,
-    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
-    priority: NOTIFICATION_PRIORITIES.NORMAL,
-    templateKey: 'form.submitted',
-  },
-  'document.generated': {
-    type: NOTIFICATION_TYPES.DOCUMENTS,
-    channels: [NOTIFICATION_CHANNELS.IN_APP],
-    priority: NOTIFICATION_PRIORITIES.NORMAL,
-    templateKey: 'document.generated',
-  },
-  'user.role.changed': {
+  'auth.user.invited': {
     type: NOTIFICATION_TYPES.AUTH,
     channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
     priority: NOTIFICATION_PRIORITIES.HIGH,
-    templateKey: 'user.role.changed',
+    templateKey: 'auth.user.invited',
   },
-  'invoice.overdue': {
-    type: NOTIFICATION_TYPES.FINANCE,
-    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL, NOTIFICATION_CHANNELS.WHATSAPP],
+  'auth.user.suspended': {
+    type: NOTIFICATION_TYPES.AUTH,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
     priority: NOTIFICATION_PRIORITIES.CRITICAL,
-    templateKey: 'invoice.overdue',
+    templateKey: 'auth.user.suspended',
+  },
+  'auth.role.changed': {
+    type: NOTIFICATION_TYPES.AUTH,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.HIGH,
+    templateKey: 'auth.role.changed',
   },
   'system.alert': {
     type: NOTIFICATION_TYPES.SYSTEM,

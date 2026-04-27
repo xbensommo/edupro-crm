@@ -7,14 +7,14 @@ import { defineCollection, FIELD_TYPES } from '@xbensommo/shard-provider'
 
 export default defineCollection({
   name: 'clientNotes',
-  shard: { type: 'monthly' },
+  shard: { type: 'none' },
   schema: {
     clientId: {
       type: FIELD_TYPES.STRING,
       required: true,
       filterable: true,
     },
-    userId: {
+    user_id : {
       type: FIELD_TYPES.STRING,
       required: true,
       filterable: true,
@@ -55,12 +55,12 @@ export default defineCollection({
       filterable: true,
     },
   },
-  writableFields: ['clientId', 'userId', 'content', 'type', 'isPublic'],
+  writableFields: ['clientId', 'user_id ', 'content', 'type', 'isPublic'],
   updateableFields: ['content', 'type', 'isPublic'],
   indexes: [
     { fields: ['clientId', 'createdAt'] },
     { fields: ['type', 'createdAt'] },
-    { fields: ['userId', 'createdAt'] },
+    { fields: ['user_id ', 'createdAt'] },
   ],
   search: {
     mode: 'token-array',

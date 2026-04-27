@@ -28,8 +28,14 @@ const classes = computed(() => {
   switch (props.status) {
     case 'posted':
     case 'closed':
+    case 'paid':
+    case 'success':
+    case 'allocated':
       return 'bg-emerald-50 text-emerald-700'
     case 'reviewed':
+    case 'issued':
+    case 'partially_paid':
+    case 'partially_allocated':
       return 'bg-sky-50 text-sky-700'
     case 'draft':
     case 'open':
