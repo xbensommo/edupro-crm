@@ -5,6 +5,7 @@
 
 import { computed } from 'vue'
 import { useAppStore } from '@app/stores/appStore/index.js'
+import { createCrmNotificationBridge } from './createCrmNotificationBridge.js'
 import {
   createActivityLogger,
   createCollectionAdapter, 
@@ -877,103 +878,48 @@ export function createCrmService() {
       .filter((user) => user?.role === role || (Array.isArray(user?.roles) && user.roles.includes(role)))
   }
 
-  async function createInAppNotifications(payloads = []) {
-    const notifications = []
-    for (const payload of payloads.filter(Boolean)) {
-      const created = await store.notificationsActions.add({
-        user_id: payload.user_id ,
-        title: payload.title,
-        message: payload.message,
-        event: payload.event,
-        type: payload.type || 'crm',
-        channel: 'in_app',
-        status: 'queued',
-        priority: payload.priority || 'normal',
-        actionUrl: payload.actionUrl || null,
-        entityType: payload.entityType || 'engagement',
-        entityId: payload.entityId || null,
-        actorId: context.getCurrentUserId() || null,
-        actorName: payload.actorName || 'System',
-        meta: payload.meta || null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-      if (created) notifications.push(created)
-    }
-    return notifications
+
+  function getCurrentActor() {
+    const current = store.currentUser?.value || store.currentUser || store.authUser?.value || store.authUser || null
+    return current && typeof current === 'object'
+      ? { id: context.getCurrentUserId() || current.uid || current.id || null, ...current }
+      : { id: context.getCurrentUserId() || null }
   }
 
-  async function notifyRoles(roles, buildPayload) {
-    const recipients = []
-    for (const role of roles) {
-      const users = await safeListUsersByRole(role)
-      recipients.push(...users)
+  function normalizeEngagementForNotifications(engagement = {}) {
+    const data = engagement?.data && typeof engagement.data === 'object' ? engagement.data : engagement
+    return {
+      ...data,
+      id: data?.id || engagement?.id || engagement?.docId || engagement?._id || data?.engagementId || null,
     }
-    const deduped = new Map()
-    for (const user of recipients) {
-      const id = user?.id || user?.uid
-      if (!id) continue
-      deduped.set(id, user)
-    }
-    return await createInAppNotifications(
-      [...deduped.values()].map((user) => buildPayload(user)).filter(Boolean),
-    )
   }
+
+  const crmNotificationBridge = createCrmNotificationBridge({
+    store,
+    currentUser: getCurrentActor,
+  })
 
   async function notifyWorkAssignment(engagement) {
-    const recipientId = engagement?.assignedConsultantId || null
-    if (!recipientId) return []
-    return await createInAppNotifications([
-      {
-        user_id: recipientId,
-        title: 'New work assigned',
-        message: `${engagement.title || 'Work'} has been assigned to you. Accept or deny the assignment.`,
-        event: 'work.assigned',
-        priority: 'high',
-        actionUrl: `/crm/work/v/${engagement.id || ''}`,
-        entityId: engagement.id || null,
-        meta: { domain: 'crm', sourceModule: 'crm', roleScope: ['consultant'] },
-      },
-      engagement.assignedEditorId
-        ? {
-            user_id: engagement.assignedEditorId,
-            title: 'Work queued for review',
-            message: `${engagement.title || 'Work'} has an assigned consultant and will need editorial review.`,
-            event: 'work.review.assigned',
-            priority: 'normal',
-            actionUrl: `/crm/work/v/${engagement.id || ''}`,
-            entityId: engagement.id || null,
-            meta: { domain: 'crm', sourceModule: 'crm', roleScope: ['consultant_editor'] },
-          }
-        : null,
-    ])
+    return crmNotificationBridge.notifyWorkAssignment(normalizeEngagementForNotifications(engagement))
   }
 
   async function notifyAssignmentDecision(engagement, decision) {
-    const roles = ['admin', 'receptionist']
-    return await notifyRoles(roles, (user) => ({
-      user_id: user.id || user.uid,
-      title: decision === 'accepted' ? 'Assignment accepted' : 'Assignment denied',
-      message: `${engagement.consultantName || 'Consultant'} ${decision} work ${engagement.engagementCode || engagement.id || ''}.`,
-      event: decision === 'accepted' ? 'work.assignment.accepted' : 'work.assignment.denied',
-      priority: decision === 'accepted' ? 'normal' : 'high',
-      actionUrl: `/crm/work/v/${engagement.id || ''}`,
-      entityId: engagement.id || null,
-      meta: { domain: 'crm', sourceModule: 'crm', roleScope: roles },
-    }))
+    return crmNotificationBridge.notifyAssignmentDecision(
+      normalizeEngagementForNotifications(engagement),
+      decision,
+    )
   }
 
   async function notifyFinalSubmission(engagement) {
-    return await notifyRoles(['admin', 'receptionist', 'consultant_editor'], (user) => ({
-      user_id: user.id || user.uid,
-      title: 'Final delivery submitted',
-      message: `${engagement.consultantName || 'Consultant'} submitted final work for ${engagement.title || engagement.engagementCode || 'an assignment'}.`,
-      event: 'work.final.submitted',
-      priority: 'high',
-      actionUrl: `/crm/work/v/${engagement.id || ''}`,
-      entityId: engagement.id || null,
-      meta: { domain: 'crm', sourceModule: 'crm', roleScope: ['admin', 'receptionist', 'consultant_editor'] },
-    }))
+    return crmNotificationBridge.notifyFinalSubmission(normalizeEngagementForNotifications(engagement))
+  }
+
+  async function notifyReviewDecision(engagement, decision = 'approved', payload = {}) {
+    return crmNotificationBridge.notifyReviewDecision(
+      normalizeEngagementForNotifications(engagement),
+      decision,
+      payload,
+    )
   }
 
   async function feedFinanceFromEngagement(engagement, mode = 'create') {
@@ -1576,7 +1522,7 @@ export function createCrmService() {
           const engagement = await add(CRM_COLLECTIONS.engagements, buildEngagemnetPayload(payload, context))
           const normalized = { ...(engagement || {}), ...(engagement?.data || {}), id: engagement?.id || engagement?.docId || engagement?._id || null }
           await feedFinanceFromEngagement(normalized, 'create')
-          await notifyWorkAssignment(normalized)
+          // await notifyWorkAssignment(normalized)
           return engagement
         },
         {
@@ -1656,6 +1602,7 @@ export function createCrmService() {
     fetchReportsSnapshot,
     syncAssignmentDecisionNotification,
     syncFinalSubmissionNotifications,
+    notifyReviewDecision,
     syncEngagementToFinance,
     createEngagementCode,
     clientPrimaryLabel,

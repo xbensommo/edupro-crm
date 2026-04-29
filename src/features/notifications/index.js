@@ -3,6 +3,7 @@
 export * from './feature.manifest.js';
 export * from './routes.js';
 export * from './permissions.js';
+export * from './collections/notification_delivery_queue.definitions.js';
 export * from './collections/notification_logs.definitions.js';
 export * from './collections/notification_templates.definitions.js';
 export * from './collections/notification_preferences.definitions.js';
@@ -21,6 +22,7 @@ export * from './services/createNotificationOrchestrator.js';
 export * from './services/createNotificationRecipientsService.js';
 export * from './services/createNotificationRepository.js';
 export * from './services/createNotificationTemplateService.js';
+export * from './services/createNotificationBridge.js';
 
 export * from './runtime/createDomainEventBus.js';
 export * from './runtime/notification-hooks.js';

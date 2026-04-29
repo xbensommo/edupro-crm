@@ -1,150 +1,134 @@
-/**
- * @file src/features/notifications/services/createNotificationDispatcher.js
- * @description Multi-channel dispatcher that writes only normalized records.
- */
+/** @file src/features/notifications/services/createNotificationDispatcher.js */
 
-import { buildNotificationLog, buildNotificationRecord } from '../utils/buildNotificationRecord.js'
-
-const DEFAULT_CHANNELS = Object.freeze({
-  IN_APP: 'in_app',
-  EMAIL: 'email',
-  WHATSAPP: 'whatsapp',
-})
-
-const DEFAULT_STATUSES = Object.freeze({
-  PENDING: 'pending',
-  SENT: 'sent',
-  FAILED: 'failed',
-})
+import { NOTIFICATION_CHANNELS } from '../constants/notification.channels.js'
+import { NOTIFICATION_STATUSES } from '../constants/notification.statuses.js'
+import { shouldQueueEmailForEvent } from '../constants/notification.events.js'
+import { buildDedupeKey } from '../utils/notification.helpers.js'
 
 /**
- * @param {{
- *   repository: {
- *     saveNotification: (payload: Record<string, any>) => Promise<Record<string, any>>,
- *     saveLog: (payload: Record<string, any>) => Promise<Record<string, any>>,
- *   },
- *   channels?: Record<string, { send: (payload: Record<string, any>) => Promise<Record<string, any>> }>,
- *   recipientField?: string,
- *   now?: () => Date,
- * }} options
+ * Persists one in-app notification row and queues external delivery rows.
+ * External providers are never called from the browser.
+ *
+ * @param {{ repository: any, recipientField?: string, now?: () => Date }} options
  */
 export function createNotificationDispatcher(options = {}) {
   const repository = options.repository
   const recipientField = options.recipientField || 'user_id'
   const now = typeof options.now === 'function' ? options.now : () => new Date()
 
-  const channels = {
-    [DEFAULT_CHANNELS.IN_APP]: {
-      async send(payload) {
-        return { ok: true, provider: 'database', payload }
-      },
-    },
-    [DEFAULT_CHANNELS.EMAIL]: {
-      async send(payload) {
-        if (!options?.channels?.email?.send) return { ok: false, provider: 'email', error: 'EMAIL_ADAPTER_NOT_CONFIGURED' }
-        return options.channels.email.send(payload)
-      },
-    },
-    [DEFAULT_CHANNELS.WHATSAPP]: {
-      async send(payload) {
-        if (!options?.channels?.whatsapp?.send) return { ok: false, provider: 'whatsapp', error: 'WHATSAPP_ADAPTER_NOT_CONFIGURED' }
-        return options.channels.whatsapp.send(payload)
-      },
-    },
-    ...options.channels,
-  }
-
   async function dispatch(payload = {}) {
     if (!repository?.saveNotification || !repository?.saveLog) {
-      throw new Error('Notification dispatcher requires a repository with saveNotification and saveLog.')
+      throw new Error('Notification dispatcher requires saveNotification and saveLog repository methods.')
     }
 
+    const channels = Array.isArray(payload.channels) && payload.channels.length
+      ? payload.channels.filter(Boolean)
+      : [NOTIFICATION_CHANNELS.IN_APP]
+
+    const notificationRecord = await repository.saveNotification({
+      ...payload,
+      channel: NOTIFICATION_CHANNELS.IN_APP,
+      channels,
+      status: channels.includes(NOTIFICATION_CHANNELS.IN_APP) ? NOTIFICATION_STATUSES.SENT : NOTIFICATION_STATUSES.QUEUED,
+      sentAt: channels.includes(NOTIFICATION_CHANNELS.IN_APP) ? now().toISOString() : null,
+    })
+
+    const notificationId = notificationRecord?.id || notificationRecord?.docId || notificationRecord?._id || null
+    const recipientId = payload.recipientId || payload[recipientField] || payload.user_id || null
     const deliveries = []
-    const channelsToUse = payload.channels?.length ? payload.channels : [DEFAULT_CHANNELS.IN_APP]
 
-    for (const channelName of channelsToUse) {
-      const notificationRecord = await repository.saveNotification(
-        buildNotificationRecord(
-          {
-            ...payload,
-            channel: channelName,
-            status: DEFAULT_STATUSES.PENDING,
-            updatedAt: now().toISOString(),
-          },
-          { recipientField, now },
-        ),
-      )
+    if (channels.includes(NOTIFICATION_CHANNELS.IN_APP)) {
+      const dedupeKey = buildDedupeKey({ ...payload, recipientId, channel: NOTIFICATION_CHANNELS.IN_APP })
+      await repository.saveLog({
+        notificationId,
+        dedupeKey,
+        recipientId,
+        [recipientField]: recipientId,
+        recipientEmail: payload.recipientEmail || null,
+        event: payload.event,
+        channel: NOTIFICATION_CHANNELS.IN_APP,
+        provider: 'firestore',
+        status: NOTIFICATION_STATUSES.SENT,
+        domain: payload.domain,
+        payload,
+        response: { ok: true },
+        sentAt: now().toISOString(),
+      })
+      deliveries.push({ ok: true, provider: 'firestore', channel: NOTIFICATION_CHANNELS.IN_APP, notificationId })
+    }
 
-      const adapter = channels[channelName]
-      if (!adapter?.send) {
-        const failedResult = {
-          ok: false,
-          notificationId: notificationRecord?.id,
-          provider: channelName,
-          error: 'CHANNEL_ADAPTER_NOT_FOUND',
-        }
-
-        await repository.saveLog(
-          buildNotificationLog(
-            {
-              notificationId: notificationRecord?.id,
-              recipientId: payload.recipientId || payload[recipientField] || payload.user_id || payload.user_id,
-              channel: channelName,
-              provider: channelName,
-              status: DEFAULT_STATUSES.FAILED,
-              error: failedResult.error,
-              payload,
-              response: failedResult,
-            },
-            { recipientField, now },
-          ),
-        )
-
-        deliveries.push(failedResult)
+    for (const channel of channels.filter((item) => item !== NOTIFICATION_CHANNELS.IN_APP)) {
+      if (channel === NOTIFICATION_CHANNELS.EMAIL && !shouldQueueEmailForEvent(payload.event)) {
+        await repository.saveLog({
+          notificationId,
+          recipientId,
+          [recipientField]: recipientId,
+          recipientEmail: payload.recipientEmail || null,
+          event: payload.event,
+          channel,
+          provider: 'policy',
+          status: NOTIFICATION_STATUSES.SKIPPED,
+          domain: payload.domain,
+          error: 'EMAIL_NOT_ALLOWED_FOR_EVENT',
+          payload,
+        })
+        deliveries.push({ ok: true, skipped: true, channel, reason: 'EMAIL_NOT_ALLOWED_FOR_EVENT', notificationId })
         continue
       }
 
-      const result = await adapter.send({
+      if (!repository?.queueDelivery) {
+        await repository.saveLog({
+          notificationId,
+          recipientId,
+          [recipientField]: recipientId,
+          recipientEmail: payload.recipientEmail || null,
+          event: payload.event,
+          channel,
+          provider: 'queue',
+          status: NOTIFICATION_STATUSES.FAILED,
+          domain: payload.domain,
+          error: 'DELIVERY_QUEUE_NOT_CONFIGURED',
+          payload,
+        })
+        deliveries.push({ ok: false, channel, error: 'DELIVERY_QUEUE_NOT_CONFIGURED', notificationId })
+        continue
+      }
+
+      const dedupeKey = buildDedupeKey({ ...payload, recipientId, channel })
+      const queued = await repository.queueDelivery({
         ...payload,
-        recipientId: payload.recipientId || payload[recipientField] || payload.user_id || payload.user_id,
-        [recipientField]: payload.recipientId || payload[recipientField] || payload.user_id || payload.user_id,
-        channel: channelName,
-        notificationId: notificationRecord?.id,
+        notificationId,
+        recipientId,
+        [recipientField]: recipientId,
+        channel,
+        dedupeKey,
+        status: 'pending',
+        templateKey: payload.templateKey || payload.event,
       })
 
-      const status = result?.ok ? DEFAULT_STATUSES.SENT : DEFAULT_STATUSES.FAILED
-
-      await repository.saveLog(
-        buildNotificationLog(
-          {
-            notificationId: notificationRecord?.id,
-            recipientId: payload.recipientId || payload[recipientField] || payload.user_id || payload.user_id,
-            channel: channelName,
-            provider: result?.provider || channelName,
-            status,
-            error: result?.error || null,
-            payload,
-            response: result || null,
-            sentAt: result?.ok ? now().toISOString() : null,
-          },
-          { recipientField, now },
-        ),
-      )
-
-      deliveries.push({
-        ...result,
-        notificationId: notificationRecord?.id,
-        channel: channelName,
-        status,
+      const queueId = queued?.id || queued?.docId || queued?._id || null
+      await repository.saveLog({
+        notificationId,
+        queueId,
+        dedupeKey,
+        recipientId,
+        [recipientField]: recipientId,
+        recipientEmail: payload.recipientEmail || null,
+        event: payload.event,
+        channel,
+        provider: 'delivery_queue',
+        status: NOTIFICATION_STATUSES.QUEUED,
+        domain: payload.domain,
+        payload,
+        response: { ok: true, queueId },
       })
+      deliveries.push({ ok: true, provider: 'delivery_queue', channel, queueId, notificationId })
     }
 
     return deliveries
   }
 
-  return {
-    dispatch,
-  }
+  return { dispatch }
 }
 
 export default createNotificationDispatcher

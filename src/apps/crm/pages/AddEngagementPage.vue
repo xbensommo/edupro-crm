@@ -260,12 +260,27 @@
           <div class="grid gap-4 md:grid-cols-2">
             <label class="grid gap-2 md:col-span-2">
               <span class="field-label mb-0">Assigned consultant</span>
-              <select v-model="form.assignedConsultantId" class="select-field">
+              <!-- <select v-model="form.assignedConsultantId" class="select-field">
                 <option value="">Select consultant</option>
                 <option
                   v-for="consultant in consultantsList"
                   :key="getRecordId(consultant)"
                   :value="assignConsultant(consultant)"
+                >
+                  {{ consultantDisplayName(consultant) }}
+                </option>
+              </select> -->
+
+              <select
+                v-model="form.assignedConsultantId"
+                class="select-field"
+                @change="syncSelectedConsultantInfo"
+              >
+                <option value="">Select consultant</option>
+                <option
+                  v-for="consultant in consultantsList"
+                  :key="getRecordId(consultant)"
+                  :value="getRecordId(consultant)"
                 >
                   {{ consultantDisplayName(consultant) }}
                 </option>
@@ -339,7 +354,7 @@
           <div class="grid gap-4 md:grid-cols-2">
             <div class="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-soft)] p-4">
               <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--color-text-soft)]">
-                Consultant share (60%)
+                Consultant share (45%)
               </p>
               <p class="mt-2 text-lg font-semibold text-[var(--color-secondary)]">
                 {{ service.money(consultantShare) }}
@@ -348,7 +363,7 @@
 
             <div class="rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-bg-soft)] p-4">
               <p class="text-[10px] font-bold uppercase tracking-[0.24em] text-[var(--color-text-soft)]">
-                Company share (40%)
+                Company share (55%)
               </p>
               <p class="mt-2 text-lg font-semibold text-[var(--color-secondary)]">
                 {{ service.money(companyShare) }}
@@ -619,6 +634,7 @@ import { useAppStore } from '@app/stores/appStore/index.js'
 import {
   useCrmService,
 } from '../services/crmService.js'
+import { createCrmNotificationBridge } from '../services/createCrmNotificationBridge.js'
 import CrmPageShell from '../components/CrmPageShell.vue'
 
 import {
@@ -646,6 +662,11 @@ const minDate = computed(() => getLocalDateString(new Date));
 const currentUser = computed(() => unref(store.currentUser) || null)
 const currentUserId = computed(() => currentUser.value?.uid || currentUser.value?.id || null)
 
+const crmNotifications = createCrmNotificationBridge({
+  store,
+  currentUser: () => currentUser.value || {},
+})
+
 const form = reactive({
   engagementCode: service.createEngagementCode(),
   clientId: '',
@@ -659,6 +680,12 @@ const form = reactive({
   institutionName: '',
   assignedConsultantId: '',
   assignedConsultantInfo: '',
+
+  assignedConsultantName: '',
+  assignedConsultantEmail: '',
+  consultantName: '',
+  consultantEmail: '',
+
   assignedTeam: '',
   priority: 'medium',
   status: 'draft',
@@ -679,7 +706,7 @@ function recordData(record) {
   if (!record || typeof record !== 'object') return {}
   return record.data && typeof record.data === 'object' ? record.data : record
 }
-
+ 
 function getCollectionItems(name) {
   const direct = store?.[name]?.items
   if (Array.isArray(direct)) return direct
@@ -772,8 +799,8 @@ const amountDue = computed(() =>
   Math.max(netAmount.value - form.amountPaidCached + form.amountRefundedCached, 0),
 )
 
-const consultantShare = computed(() => roundMoney(netAmount.value * 0.6))
-const companyShare = computed(() => roundMoney(netAmount.value * 0.4))
+const consultantShare = computed(() => roundMoney(netAmount.value * 0.45))
+const companyShare = computed(() => roundMoney(netAmount.value * 0.55))
 
 const canSubmit = computed(() => {
   return Boolean(
@@ -789,9 +816,75 @@ function consultantDisplayName(usr) {
   return [data.firstName, data.lastName].filter(Boolean).join(' ') || data.displayName || data.email;
 }
 
-function assignConsultant(usr){
+/*function assignConsultant(usr){
   form.assignedConsultantInfo = `${usr.data.firstName} ${usr.data.lastName}`;
   return usr.id;
+}*/
+
+function syncSelectedConsultantInfo() {
+  const consultant = selectedConsultant.value
+
+  if (!consultant) {
+    form.assignedConsultantInfo = ''
+    form.assignedConsultantName = ''
+    form.assignedConsultantEmail = ''
+    form.consultantName = ''
+    form.consultantEmail = ''
+    return
+  }
+
+  const data = recordData(consultant)
+  const displayName = consultantDisplayName(consultant)
+
+  form.assignedConsultantInfo = displayName
+  form.assignedConsultantName = displayName
+  form.assignedConsultantEmail = data.email || ''
+  form.consultantName = displayName
+  form.consultantEmail = data.email || ''
+}
+
+function buildEngagementNotificationPayload({
+  engagementId,
+  engagementCode,
+  payload,
+  uploadedFilesPayload = [],
+  uploadedFileUrls = [],
+}) {
+  return {
+    ...payload,
+
+    id: engagementId,
+    docId: engagementId,
+    engagementId,
+
+    entityType: 'engagement',
+    entityId: engagementId,
+
+    engagementCode,
+    title: payload.title,
+    clientId: payload.clientId,
+    clientName: payload.clientName || selectedClientLabel.value || 'Client',
+
+    assignedConsultantId: payload.assignedConsultantId || '',
+    assignedConsultantInfo: payload.assignedConsultantInfo || '',
+    assignedConsultantName: payload.assignedConsultantName || payload.assignedConsultantInfo || '',
+    assignedConsultantEmail: payload.assignedConsultantEmail || '',
+    consultantName: payload.consultantName || payload.assignedConsultantInfo || '',
+    consultantEmail: payload.consultantEmail || payload.assignedConsultantEmail || '',
+
+    dueDate: payload.dueDate || '',
+    priority: payload.priority || 'medium',
+
+    files: uploadedFilesPayload,
+    fileUrls: uploadedFileUrls,
+    attachmentsCount: uploadedFilesPayload.length,
+    hasAttachments: uploadedFilesPayload.length > 0,
+
+    actorId: currentUserId.value,
+    actorName: [currentUser.value?.firstName, currentUser.value?.lastName]
+      .filter(Boolean)
+      .join(' ') || currentUser.value?.email || 'System',
+  }
 }
 
 function resolveStorage() {
@@ -1069,7 +1162,7 @@ function resetForm(keepClient = false) {
   clearQueuedFiles()
 }
 
- async function submitEngagement() {
+async function submitEngagement() {
   submitting.value = true
   errorMessage.value = ''
   successMessage.value = ''
@@ -1081,7 +1174,12 @@ function resetForm(keepClient = false) {
 
     const payload = {
       ...form,
-  
+
+      assignedConsultantName: form.assignedConsultantName || form.assignedConsultantInfo || '',
+      assignedConsultantEmail: form.assignedConsultantEmail || '',
+      consultantName: form.consultantName || form.assignedConsultantInfo || '',
+      consultantEmail: form.consultantEmail || form.assignedConsultantEmail || '',
+
       netAmountCached: netAmount.value,
       amountDueCached: amountDue.value,
       consultantShareCached: consultantShare.value,
@@ -1125,14 +1223,42 @@ function resetForm(keepClient = false) {
       .map((file) => file.url)
       .filter(Boolean)
 
-    // const engagementsActions = requireCollectionActions('engagements')
-    
     await store.engagementsActions.update(engagementId, {
       fileUrls: uploadedFileUrls,
       files: uploadedFilesPayload,
       attachmentsCount: uploadedFilesPayload.length,
       hasAttachments: uploadedFilesPayload.length > 0,
     })
+
+    const engagementForNotification = buildEngagementNotificationPayload({
+      engagementId,
+      engagementCode,
+      payload,
+      uploadedFilesPayload,
+      uploadedFileUrls,
+    })
+
+    const notificationJobs = [
+      crmNotifications.notifyWorkCreated(engagementForNotification),
+    ] 
+
+    if (form.assignedConsultantId) {
+      notificationJobs.push(
+        crmNotifications.notifyWorkAssignment(engagementForNotification),
+      )
+    }
+
+    const notificationResults = await Promise.allSettled(notificationJobs)
+    const failedNotificationCount = notificationResults.filter(
+      (result) => result.status === 'rejected',
+    ).length
+
+    if (failedNotificationCount) {
+      console.warn(
+        `[crm] Work ${engagementCode} saved, but ${failedNotificationCount} notification job(s) failed.`,
+        notificationResults,
+      )
+    }
 
     await Promise.allSettled([
       service.fetchRecentEngagements?.(),

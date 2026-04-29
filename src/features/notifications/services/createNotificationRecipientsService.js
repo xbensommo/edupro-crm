@@ -1,103 +1,109 @@
-/**
- * @file src/features/notifications/services/createNotificationRecipientsService.js
- * @description Recipient resolution with one canonical recipient id.
- */
+/** @file src/features/notifications/services/createNotificationRecipientsService.js */
+
+import { normalizeStoreRow } from '../utils/notification.helpers.js'
+
+function normalizeRole(value) {
+  return String(value || '').trim().toLowerCase().replace(/-/g, '_')
+}
+
+function userMatchesRole(user, role) {
+  const target = normalizeRole(role)
+  if (!target) return false
+  const userRole = normalizeRole(user?.role)
+  const roles = Array.isArray(user?.roles) ? user.roles.map(normalizeRole) : []
+  return userRole === target || roles.includes(target)
+}
 
 /**
- * Resolve recipients for notification events.
- *
- * @param {{ currentUser?: () => any, userDirectory?: { listByRole?: (role: string) => Promise<any[]> }, recipientField?: string }} [options={}]
+ * @param {{ store?: any, currentUser?: () => any, recipientField?: string }} options
  */
 export function createNotificationRecipientsService(options = {}) {
+  const store = options.store || null
   const currentUser = typeof options.currentUser === 'function' ? options.currentUser : () => null
-  const userDirectory = options.userDirectory || {}
-  const recipientField = options.recipientField || 'userId'
+  const recipientField = options.recipientField || 'user_id'
 
-  async function listByRole(role) {
-    if (typeof userDirectory.listByRole !== 'function') return []
-    return (await userDirectory.listByRole(role)) || []
-  }
-
-  function getRecipientId(record) {
-    return record?.recipientId || record?.[recipientField] || record?.userId || record?.user_id || record?.uid || record?.id || null
-  }
-
-  function addRecipient(map, record) {
-    if (!record) return
-    const id = getRecipientId(record)
-    if (!id) return
-    map.set(id, { ...record, recipientId: id, [recipientField]: id })
-  }
-
-  async function addRoleRecipients(map, roles = []) {
-    for (const role of roles) {
-      const rows = await listByRole(role)
-      for (const row of rows) addRecipient(map, row)
+  function fromUser(user) {
+    if (!user) return null
+    const row = normalizeStoreRow(user)
+    const id = row?.id || row?.uid || row?.[recipientField]
+    if (!id) return null
+    return {
+      recipientId: id,
+      [recipientField]: id,
+      recipientEmail: row.email || row.emailAddress || null,
+      recipientName: row.displayName || row.fullName || [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email || id,
+      role: row.role || null,
+      roles: Array.isArray(row.roles) ? row.roles : [],
+      raw: row,
     }
+  }
+
+  async function listLoadedUsers() {
+    const rows = store?.users?.items || store?.users || []
+    return Array.isArray(rows) ? rows.map(normalizeStoreRow).filter(Boolean) : []
+  }
+
+  async function listUsersByRole(role) {
+    const loaded = await listLoadedUsers()
+    const matches = loaded.filter((user) => userMatchesRole(user, role))
+    if (matches.length) return matches
+
+    const usersActions = store?.getCollectionActions?.('users') || store?.usersActions
+    if (!usersActions?.fetchByFilters) return []
+
+    await usersActions.fetchByFilters({
+      filters: [{ field: 'role', op: '==', value: role }],
+      pageSize: 50,
+    })
+    const fetchedRows = usersActions.state?.items || store?.users?.items || []
+    return fetchedRows.map(normalizeStoreRow).filter((user) => userMatchesRole(user, role))
   }
 
   async function resolveRecipients(event, payload = {}) {
-    const recipients = new Map()
+    const direct = []
 
-    for (const target of payload.recipientIds || []) addRecipient(recipients, { recipientId: target })
-    for (const role of payload.recipientRoles || []) await addRoleRecipients(recipients, [role])
+    if (payload.recipient) direct.push(payload.recipient)
+    if (payload.recipientId || payload[recipientField]) {
+      direct.push({
+        recipientId: payload.recipientId || payload[recipientField],
+        [recipientField]: payload.recipientId || payload[recipientField],
+        recipientEmail: payload.recipientEmail || payload.email || null,
+        recipientName: payload.recipientName || payload.fullName || null,
+      })
+    }
 
-    const directIds = [
-      payload.recipientId,
-      payload[recipientField],
-      payload.userId,
-      payload.user_id,
-      payload.assigneeId,
-      payload.assignedConsultantId,
-      payload.consultantId,
-      payload.consultantEditorId,
-      payload.reviewedBy,
-      payload.reviewerId,
-      payload.clientOwnerId,
+    if (Array.isArray(payload.recipientIds)) {
+      for (const id of payload.recipientIds) direct.push({ recipientId: id, [recipientField]: id })
+    }
+
+    if (Array.isArray(payload.recipients)) direct.push(...payload.recipients)
+
+    const roleNames = [
+      ...(Array.isArray(payload.roles) ? payload.roles : []),
+      ...(Array.isArray(payload.roleScope) ? payload.roleScope : payload.roleScope ? [payload.roleScope] : []),
     ].filter(Boolean)
 
-    for (const id of directIds) addRecipient(recipients, { recipientId: id })
-
-    if (event.startsWith('crm.work.') || event.startsWith('crm.assignment.') || event.startsWith('crm.final_delivery.')) {
-      await addRoleRecipients(recipients, ['admin', 'receptionist'])
+    for (const role of roleNames) {
+      const users = await listUsersByRole(role)
+      direct.push(...users)
     }
 
-    if (event.startsWith('crm.review.')) {
-      await addRoleRecipients(recipients, ['admin', 'receptionist', 'consultant_editor'])
+    if (payload.notifyCurrentUser === true) {
+      const user = currentUser()
+      if (user) direct.push(user)
     }
 
-    if (event.startsWith('finance.')) {
-      await addRoleRecipients(recipients, ['admin', 'receptionist'])
-      if (payload.notifyConsultant !== false && payload.consultantId) {
-        addRecipient(recipients, { recipientId: payload.consultantId })
-      }
+    const deduped = new Map()
+    for (const item of direct) {
+      const recipient = fromUser(item)
+      if (!recipient?.recipientId) continue
+      deduped.set(recipient.recipientId, { ...deduped.get(recipient.recipientId), ...recipient })
     }
 
-    if (event.startsWith('client_record.')) {
-      await addRoleRecipients(recipients, ['admin', 'receptionist'])
-    }
-
-    if (event.startsWith('auth.')) {
-      await addRoleRecipients(recipients, ['admin'])
-      if (payload.recipientId || payload[recipientField] || payload.userId || payload.user_id) {
-        addRecipient(recipients, {
-          recipientId: payload.recipientId || payload[recipientField] || payload.userId || payload.user_id,
-        })
-      }
-    }
-
-    if (payload.notifyAdmins || event === 'system.alert') {
-      await addRoleRecipients(recipients, ['admin'])
-    }
-
-    if (payload.includeActor) addRecipient(recipients, currentUser())
-
-    return [...recipients.values()].filter((item) => getRecipientId(item))
+    return [...deduped.values()]
   }
 
-  return {
-    resolveRecipients,
-  }
+  return { resolveRecipients, listUsersByRole }
 }
 
 export default createNotificationRecipientsService

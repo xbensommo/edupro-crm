@@ -1,52 +1,68 @@
 /** @file src/features/notifications/utils/notification.helpers.js */
 
 /**
- * Create a stable notification identifier.
- *
+ * @param {unknown} value
  * @returns {string}
  */
-export function createNotificationId() {
-  return `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+export function asCleanText(value) {
+  return String(value ?? '').trim()
 }
 
 /**
- * Replace {{ token }} placeholders in a template string.
- *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function nullableText(value) {
+  const text = asCleanText(value)
+  return text || null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+export function cleanArray(value) {
+  return Array.isArray(value) ? value.filter(Boolean) : []
+}
+
+/**
+ * Small safe interpolation helper for internal notification templates.
  * @param {string} template
- * @param {Record<string, unknown>} variables
+ * @param {Record<string, any>} variables
  * @returns {string}
  */
 export function interpolateTemplate(template = '', variables = {}) {
-  return String(template).replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, token) => {
-    const parts = token.split('.');
-    let value = variables;
-
-    for (const part of parts) {
-      value = value?.[part];
-    }
-
-    return value == null ? '' : String(value);
-  });
+  return String(template || '').replace(/{{\s*([\w.]+)\s*}}/g, (_, key) => {
+    const value = key.split('.').reduce((carry, part) => carry?.[part], variables)
+    return value === undefined || value === null ? '' : String(value)
+  })
 }
 
 /**
- * Safely normalize a date value to ISO.
- *
- * @param {Date|string|number|null|undefined} value
- * @returns {string|null}
+ * Deterministic enough for client-created queue dedupe keys.
+ * The worker enforces server-side dedupe again.
+ * @param {Record<string, any>} payload
+ * @returns {string}
  */
-export function toIsoString(value) {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+export function buildDedupeKey(payload = {}) {
+  return [
+    payload.entityType || 'entity',
+    payload.entityId || payload.id || 'unknown',
+    payload.event || 'event',
+    payload.recipientId || payload.user_id || payload.recipientEmail || 'recipient',
+    payload.channel || 'channel',
+  ]
+    .map((part) => String(part || '').trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_.:-]/g, ''))
+    .join(':')
 }
 
 /**
- * Normalize a boolean-ish value.
- *
  * @param {unknown} value
- * @returns {boolean}
+ * @returns {Record<string, any>|null}
  */
-export function toBoolean(value) {
-  return value === true || value === 'true' || value === 1 || value === '1';
+export function normalizeStoreRow(value) {
+  if (!value) return null
+  const data = value?.data && typeof value.data === 'object' ? value.data : value
+  const id = value?.id || value?.docId || value?._id || data?.id || data?.uid || null
+  return { id, ...data }
 }

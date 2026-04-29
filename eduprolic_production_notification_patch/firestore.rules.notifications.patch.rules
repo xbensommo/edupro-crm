@@ -1,0 +1,59 @@
+// Add inside match /databases/{database}/documents {}
+
+function isSignedIn() {
+  return request.auth != null;
+}
+
+function role() {
+  return request.auth.token.role;
+}
+
+function isStaff() {
+  return isSignedIn() && role() in ['admin', 'receptionist', 'consultant', 'consultant_editor', 'sys_admin'];
+}
+
+function isAdminStaff() {
+  return isSignedIn() && role() in ['admin', 'receptionist', 'sys_admin'];
+}
+
+match /notifications/{id} {
+  allow read: if (isStaff() && resource.data.user_id == request.auth.uid) || isAdminStaff();
+  allow create: if isStaff() && request.resource.data.user_id is string;
+  allow update: if isStaff()
+    && resource.data.user_id == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readAt', 'archivedAt', 'updatedAt']);
+  allow delete: if false;
+}
+
+match /notification_preferences/{id} {
+  allow read, update: if (isStaff() && resource.data.user_id == request.auth.uid) || isAdminStaff();
+  allow create: if (isStaff() && request.resource.data.user_id == request.auth.uid) || isAdminStaff();
+  allow delete: if false;
+}
+
+match /notification_templates/{id} {
+  allow read: if isStaff();
+  allow write: if isAdminStaff();
+}
+
+match /notification_delivery_queue/{id} {
+  allow read: if isAdminStaff();
+  // Client-side code may queue delivery only through trusted staff actions.
+  // For stricter security, move queue creation to a callable/server function.
+  allow create: if isStaff()
+    && request.resource.data.status == 'pending'
+    && request.resource.data.channel in ['email', 'push']
+    && request.resource.data.event is string
+    && request.resource.data.dedupeKey is string;
+  allow update, delete: if false;
+}
+
+match /notification_logs/{id} {
+  allow read: if isAdminStaff();
+  allow create: if isStaff();
+  allow update, delete: if false;
+}
+
+match /_notification_delivery_locks/{id} {
+  allow read, write: if false;
+}

@@ -1,5 +1,8 @@
 /** @file src/features/notifications/routes.js */
 
+const notificationUserRoles = ['admin', 'receptionist', 'consultant', 'editor', 'consultant_editor', 'consultant-editor', 'sysadmin', 'sys_admin']
+const notificationAdminRoles = ['admin', 'sysadmin', 'sys_admin']
+
 const routes = [
   {
     path: '/notifications',
@@ -9,12 +12,12 @@ const routes = [
       title: 'Notifications',
       description: 'Unified EduProLIC notification center for auth, finance, CRM, and client records.',
       requiresAuth: true,
-      hideInNav: true,
       layout: 'app',
       featureId: 'notifications',
       navLabel: 'Notifications',
       icon: 'fa-regular fa-bell',
-      order: 58, roles: ['sysadmin'],
+      order: 58,
+      roles: notificationUserRoles,
       permission: 'notifications.notifications.read',
     },
   },
@@ -26,10 +29,10 @@ const routes = [
       title: 'Notification Preferences',
       requiresAuth: true,
       layout: 'app',
+      hideInNav: true,
       featureId: 'notifications',
+      roles: notificationUserRoles,
       permission: 'notifications.preferences.read',
-      //roles: ['admin', 'receptionist', 'consultant', 'consultant_editor'],
-      roles: ['sysadmin'],
     },
   },
   {
@@ -39,10 +42,11 @@ const routes = [
     meta: {
       title: 'Notification Templates',
       requiresAuth: true,
+      hideInNav: true,
       layout: 'app',
       featureId: 'notifications',
+      roles: notificationAdminRoles,
       permission: 'notifications.templates.manage',
-      roles: ['sysadmin'],
     },
   },
   {
@@ -52,12 +56,27 @@ const routes = [
     meta: {
       title: 'Notification Delivery Logs',
       requiresAuth: true,
+      hideInNav: true,
       layout: 'app',
       featureId: 'notifications',
+      roles: notificationAdminRoles,
       permission: 'notifications.logs.read',
-      roles: ['sysadmin'],
     },
   },
-];
+  {
+    path: '/notifications/:id',
+    name: 'NotificationDetails',
+    component: () => import('./pages/NotificationDetailsPage.vue'),
+    meta: {
+      title: 'Notification Details',
+      requiresAuth: true,
+      hideInNav: true,
+      layout: 'app',
+      featureId: 'notifications',
+      roles: notificationUserRoles,
+      permission: 'notifications.notifications.read',
+    },
+  },
+]
 
-export default routes;
+export default routes

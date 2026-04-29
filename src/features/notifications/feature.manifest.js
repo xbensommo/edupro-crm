@@ -7,7 +7,7 @@ export const NOTIFICATIONS_FEATURE_ID = 'notifications';
 export const notificationsFeatureManifest = {
   id: NOTIFICATIONS_FEATURE_ID,
   kind: 'feature',
-  version: '1.1.0',
+  version: '1.2.0',
   name: 'Notifications',
   description: 'EduProLIC notification feature for auth, finance, CRM, client-records, and work review workflows.',
   category: 'foundation',
@@ -45,10 +45,11 @@ export const notificationsFeatureManifest = {
   },
   routes: notificationsRoutes,
   collections: [
+    'notifications',
+    'notification_delivery_queue',
     'notification_logs',
     'notification_templates',
     'notification_preferences',
-    'notifications',
   ],
   capabilities: {
     inApp: true,

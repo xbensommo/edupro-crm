@@ -1,16 +1,25 @@
 /** @file src/features/notifications/composables/useUnreadCount.js */
 
-import { computed } from 'vue';
-import { useNotificationsStore } from '../stores/useNotificationsStore.js';
+import { computed, onMounted } from 'vue'
+import { useNotificationsStore } from '../stores/useNotificationsStore.js'
 
 /**
- * Read-only unread count composable.
- *
- * @returns {import('vue').ComputedRef<number>}
+ * Lightweight unread counter for topbars and badges.
+ * @returns {{ unreadCount: import('vue').ComputedRef<number>, refreshUnreadCount: () => Promise<any> }}
  */
 export function useUnreadCount() {
-  const store = useNotificationsStore();
-  return computed(() => store.unreadCount);
+  const store = useNotificationsStore()
+  const unreadCount = computed(() => store.unreadCount)
+
+  async function refreshUnreadCount() {
+    return store.fetchNotifications({ pageSize: 25 })
+  }
+
+  onMounted(() => {
+    if (!store.items.length) refreshUnreadCount().catch(() => null)
+  })
+
+  return { unreadCount, refreshUnreadCount }
 }
 
-export default useUnreadCount;
+export default useUnreadCount

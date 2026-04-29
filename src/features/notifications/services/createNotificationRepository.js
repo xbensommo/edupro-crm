@@ -1,39 +1,21 @@
-/**
- * @file src/features/notifications/services/createNotificationRepository.js
- * @description Repository with one canonical runtime contract for notifications.
- */
+/** @file src/features/notifications/services/createNotificationRepository.js */
 
 import { useAppStore } from '@app/stores/appStore'
 import {
+  buildNotificationDeliveryQueueItem,
   buildNotificationLog,
   buildNotificationPreferences,
   buildNotificationRecord,
 } from '../utils/buildNotificationRecord.js'
+import { normalizeStoreRow } from '../utils/notification.helpers.js'
 
-/**
- * Convert store rows into plain records with ids.
- *
- * @param {any[]} [rows=[]]
- * @returns {Record<string, any>[]}
- */
-function normalizeRows(rows = []) {
-  return rows
-    .filter(Boolean)
-    .map((entry) => {
-      const data = entry?.data && typeof entry.data === 'object' ? entry.data : entry
-      const id = entry?.id || entry?.docId || data?.id || null
-      return { id, ...data }
-    })
+function rowsFromActions(actions, fallbackRows = []) {
+  const rows = actions?.state?.items || fallbackRows || []
+  return Array.isArray(rows) ? rows.map(normalizeStoreRow).filter(Boolean) : []
 }
 
 /**
- * Build a repository around shard-provider collection actions.
- *
- * @param {{
- *   store?: any,
- *   recipientField?: string,
- *   now?: () => Date,
- * }} [options={}]
+ * @param {{ store?: any, recipientField?: string, now?: () => Date }} options
  */
 export function createNotificationRepository(options = {}) {
   const store = options.store || useAppStore()
@@ -45,57 +27,82 @@ export function createNotificationRepository(options = {}) {
     notificationPreferences: store.getCollectionActions?.('notification_preferences') || store.notification_preferencesActions,
     notificationTemplates: store.getCollectionActions?.('notification_templates') || store.notification_templatesActions,
     notificationLogs: store.getCollectionActions?.('notification_logs') || store.notification_logsActions,
+    notificationDeliveryQueue: store.getCollectionActions?.('notification_delivery_queue') || store.notification_delivery_queueActions,
   }
 
   function requireActions(key) {
     const target = actions[key]
-    if (!target) {
-      throw new Error(`Notification repository missing collection actions for '${key}'.`)
-    }
+    if (!target) throw new Error(`Notification repository missing collection actions for '${key}'.`)
     return target
   }
 
+  /*async function listNotifications(params = {}) {
+    const notifications = requireActions('notifications')
+    const filters = []
+    const recipientId = params.recipientId || params[recipientField] || params.user_id || null
+    if (recipientId) filters.push({ field: recipientField, op: '==', value: recipientId })
+    if (params.status) filters.push({ field: 'status', op: '==', value: params.status })
+    if (params.event) filters.push({ field: 'event', op: '==', value: params.event })
+    await notifications.fetchByFilters?.({ filters, pageSize: params.pageSize || 50 })
+    return rowsFromActions(notifications, store.notifications?.items)
+  }*/
+
   async function listNotifications(params = {}) {
     const notifications = requireActions('notifications')
-    const recipientId = params.recipientId || params.user_id || params.user_id || null
     const filters = []
+
+    const recipientId = params.recipientId || params[recipientField] || params.user_id || null
 
     if (recipientId) {
       filters.push({ field: recipientField, op: '==', value: recipientId })
+    }
+
+    if (params.roleScope) {
+      filters.push({ field: 'roleScope', op: 'array-contains', value: params.roleScope })
     }
 
     if (params.status) {
       filters.push({ field: 'status', op: '==', value: params.status })
     }
 
-    await notifications.fetchByFilters?.({ filters })
-    const stateRows = notifications.state?.items || store.notifications?.items || []
-    return normalizeRows(stateRows)
-  }
+    if (params.event) {
+      filters.push({ field: 'event', op: '==', value: params.event })
+    }
 
-  async function listTemplates() {
-    const templates = requireActions('notificationTemplates')
-    await templates.fetchInitialPage?.({ pageSize: 100, sortBy: 'createdAt', sortDirection: 'desc' })
-    const stateRows = templates.state?.items || store.notification_templates?.items || []
-    return normalizeRows(stateRows)
+    if (!filters.length && !params.allowGlobalRead) {
+      return []
+    }
+
+    await notifications.fetchByFilters?.({
+      filters,
+      pageSize: params.pageSize || 50,
+      sortBy: params.sortBy || 'createdAt',
+      sortDirection: params.sortDirection || 'desc',
+    })
+
+    return rowsFromActions(notifications, store.notifications?.items)
   }
 
   async function listLogs(params = {}) {
     const logs = requireActions('notificationLogs')
     const filters = []
-    if (params.notificationId) {
-      filters.push({ field: 'notificationId', op: '==', value: params.notificationId })
-    }
-    await logs.fetchByFilters?.({ filters })
-    const stateRows = logs.state?.items || store.notification_logs?.items || []
-    return normalizeRows(stateRows)
+    if (params.notificationId) filters.push({ field: 'notificationId', op: '==', value: params.notificationId })
+    if (params.dedupeKey) filters.push({ field: 'dedupeKey', op: '==', value: params.dedupeKey })
+    await logs.fetchByFilters?.({ filters, pageSize: params.pageSize || 50 })
+    return rowsFromActions(logs, store.notification_logs?.items)
+  }
+
+  async function listTemplates() {
+    const templates = requireActions('notificationTemplates')
+    await templates.fetchInitialPage?.({ pageSize: 100, sortBy: 'createdAt', sortDirection: 'desc' })
+    return rowsFromActions(templates, store.notification_templates?.items)
   }
 
   async function getPreferences(recipientId) {
+    if (!recipientId) return null
     const preferences = requireActions('notificationPreferences')
-    await preferences.fetchByFilters?.({ filters: [{ field: recipientField, op: '==', value: recipientId }] })
-    const rows = normalizeRows(preferences.state?.items || store.notification_preferences?.items || [])
-    return rows[0] || null
+    await preferences.fetchByFilters?.({ filters: [{ field: recipientField, op: '==', value: recipientId }], pageSize: 1 })
+    return rowsFromActions(preferences, store.notification_preferences?.items)[0] || null
   }
 
   async function saveNotification(payload) {
@@ -108,19 +115,20 @@ export function createNotificationRepository(options = {}) {
     return logs.add(buildNotificationLog(payload, { recipientField, now }))
   }
 
+  async function queueDelivery(payload) {
+    const queue = requireActions('notificationDeliveryQueue')
+    const record = buildNotificationDeliveryQueueItem(payload, { recipientField, now })
+    return queue.add(record)
+  }
+
   async function upsertPreferences(recipientId, payload = {}) {
     const preferences = requireActions('notificationPreferences')
     const current = await getPreferences(recipientId)
     const normalized = buildNotificationPreferences(recipientId, payload, { recipientField, now })
-
     if (current?.id) {
-      await preferences.update(current.id, {
-        ...normalized,
-        createdAt: current.createdAt || normalized.createdAt,
-      })
+      await preferences.update(current.id, { ...normalized, createdAt: current.createdAt || normalized.createdAt })
       return { ...current, ...normalized }
     }
-
     return preferences.add(normalized)
   }
 
@@ -133,17 +141,6 @@ export function createNotificationRepository(options = {}) {
     })
   }
 
-  async function markAllRead(recipientId, ids = []) {
-    const targetIds = ids.length
-      ? ids
-      : (await listNotifications({ recipientId }))
-          .filter((item) => !item.readAt)
-          .map((item) => item.id)
-          .filter(Boolean)
-
-    return Promise.all(targetIds.map((id) => markRead(id)))
-  }
-
   async function archiveNotification(notificationId) {
     const notifications = requireActions('notifications')
     return notifications.update(notificationId, {
@@ -154,17 +151,17 @@ export function createNotificationRepository(options = {}) {
   }
 
   return {
+    actions,
     listNotifications,
-    listTemplates,
     listLogs,
+    listTemplates,
     getPreferences,
     saveNotification,
     saveLog,
+    queueDelivery,
     upsertPreferences,
     markRead,
-    markAllRead,
     archiveNotification,
-    actions,
   }
 }
 

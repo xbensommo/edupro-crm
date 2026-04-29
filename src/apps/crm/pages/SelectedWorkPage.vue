@@ -403,7 +403,6 @@ import { useRoute } from 'vue-router'
 import CrmPageShell from '../components/CrmPageShell.vue'
 import Loader from '@app/components/SkeletonLoader.vue'
 import { useAppStore } from '@app/stores/appStore'
-//import { CONFIRM_MODAL_STORE_KEY } from '@action_modal/components/modals/confirmModal.const'
 import { useActionExecutor } from '@action_modal/composables/use-action-executor.js';
 import { useCrmService } from '../services/crmService.js'
 

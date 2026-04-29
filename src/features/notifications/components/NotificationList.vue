@@ -1,8 +1,14 @@
 <script setup>
+import { formatDateTime, humanizeToken, isUnread } from '../utils/notification.filters.js'
+
 defineProps({
   items: {
     type: Array,
     default: () => [],
+  },
+  loading: {
+    type: Boolean,
+    default: false,
   },
   emptyTitle: {
     type: String,
@@ -10,7 +16,7 @@ defineProps({
   },
   emptyText: {
     type: String,
-    default: 'New alerts from CRM, booking, forms, documents, and finance will show here.',
+    default: 'Operational alerts from CRM, finance, auth, and client records will appear here.',
   },
 })
 
@@ -19,40 +25,56 @@ const emit = defineEmits(['open', 'mark-read', 'archive'])
 
 <template>
   <div class="space-y-3">
-    <div v-if="items.length" class="space-y-3">
+    <div v-if="loading" class="rounded-2xl border p-6 text-sm text-[color:var(--color-muted,#6b7280)]">
+      Loading notifications…
+    </div>
+
+    <div v-else-if="items.length" class="space-y-3">
       <article
         v-for="item in items"
         :key="item.id"
-        class="notification-card rounded-2xl border p-4 transition hover:-translate-y-0.5"
+        :class="['notification-card rounded-2xl border p-4 transition hover:-translate-y-0.5', isUnread(item) ? 'notification-card-unread' : '']"
       >
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="pill pill-type">{{ item.type || 'system' }}</span>
-              <span v-if="item.priority" class="pill pill-priority">{{ item.priority }}</span>
-              <span v-if="!item.readAt" class="pill pill-new">new</span>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <button class="min-w-0 text-left" type="button" @click="$emit('open', item)">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="pill pill-type">{{ humanizeToken(item.type || item.domain || 'system') }}</span>
+              <span v-if="item.priority" class="pill pill-priority">{{ humanizeToken(item.priority) }}</span>
+              <span v-if="item.isActionRequired" class="pill pill-action">action</span>
+              <span v-if="isUnread(item)" class="pill pill-new">new</span>
             </div>
 
             <h3 class="mt-3 text-sm font-semibold sm:text-base">
-              {{ item.title }}
+              {{ item.title || 'Untitled notification' }}
             </h3>
 
-            <p class="mt-1 text-sm leading-6 text-[color:var(--color-muted,#6b7280)]">
-              {{ item.message }}
+            <p class="mt-1 line-clamp-3 text-sm leading-6 text-[color:var(--color-muted,#6b7280)]">
+              {{ item.message || 'No message provided.' }}
             </p>
 
             <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--color-muted,#6b7280)]">
-              <span>{{ item.channel }}</span>
+              <span>{{ humanizeToken(item.channel || (item.channels || [])[0] || 'in_app') }}</span>
               <span>•</span>
-              <span>{{ item.event }}</span>
-              <span v-if="item.entityId">•</span>
-              <span v-if="item.entityId">{{ item.entityId }}</span>
+              <span>{{ item.event || 'system.alert' }}</span>
+              <span v-if="item.entityLabel || item.entityId">•</span>
+              <span v-if="item.entityLabel || item.entityId">{{ item.entityLabel || item.entityId }}</span>
+              <span>•</span>
+              <span>{{ formatDateTime(item.createdAt) }}</span>
             </div>
-          </div>
+          </button>
 
-          <div class="flex shrink-0 flex-col gap-2">
-            <button class="action-btn" type="button" @click="$emit('mark-read', item)">Read</button>
-            <button class="action-btn" type="button" @click="$emit('archive', item)">Archive</button>
+          <div class="flex shrink-0 flex-wrap gap-2 lg:flex-col">
+            <button
+              class="action-btn"
+              :disabled="!isUnread(item)"
+              type="button"
+              @click="$emit('mark-read', item)"
+            >
+              Read
+            </button>
+            <button class="action-btn" type="button" @click="$emit('archive', item)">
+              Archive
+            </button>
             <button class="action-btn action-btn-primary" type="button" @click="$emit('open', item)">
               Open
             </button>
@@ -61,11 +83,7 @@ const emit = defineEmits(['open', 'mark-read', 'archive'])
       </article>
     </div>
 
-    <div
-      v-else
-      class="rounded-2xl border p-6 text-center"
-      style="background: var(--color-surface, #fff); border-color: var(--color-border, #e5e7eb);"
-    >
+    <div v-else class="empty-state rounded-2xl border p-6 text-center">
       <h3 class="text-sm font-semibold sm:text-base">{{ emptyTitle }}</h3>
       <p class="mt-2 text-sm text-[color:var(--color-muted,#6b7280)]">{{ emptyText }}</p>
     </div>
@@ -73,10 +91,16 @@ const emit = defineEmits(['open', 'mark-read', 'archive'])
 </template>
 
 <style scoped>
-.notification-card {
+.notification-card,
+.empty-state,
+div[loading] {
   background: var(--color-surface, #ffffff);
   border-color: var(--color-border, #e5e7eb);
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+}
+
+.notification-card-unread {
+  border-color: color-mix(in srgb, var(--color-primary, #1860a8) 45%, var(--color-border, #e5e7eb));
 }
 
 .pill {
@@ -85,9 +109,9 @@ const emit = defineEmits(['open', 'mark-read', 'archive'])
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 
 .pill-type {
@@ -100,8 +124,13 @@ const emit = defineEmits(['open', 'mark-read', 'archive'])
   background: color-mix(in srgb, var(--color-accent, #111827) 8%, white);
 }
 
+.pill-action {
+  color: #92400e;
+  background: #fef3c7;
+}
+
 .pill-new {
-  color: white;
+  color: #ffffff;
   background: var(--color-primary, #1860a8);
 }
 
@@ -112,12 +141,17 @@ const emit = defineEmits(['open', 'mark-read', 'archive'])
   background: transparent;
   padding: 0.55rem 0.8rem;
   font-size: 0.76rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text, #111827);
 }
 
+.action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .action-btn-primary {
-  color: white;
+  color: #ffffff;
   border-color: transparent;
   background: var(--color-primary, #1860a8);
 }
