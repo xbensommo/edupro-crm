@@ -1,8 +1,18 @@
 <template>
   <section class="min-h-full space-y-6 bg-[var(--color-neutral,#F8FAFC)] p-4 md:p-6">
-    <FinancePageHeader eyebrow="Client Billing" title="Invoices" description="Draft, issue, cancel, and track client invoices before payments are allocated.">
+    <FinancePageHeader 
+      eyebrow="Client Billing" 
+      title="Invoices" 
+      description="Draft, issue, cancel, and track client invoices before payments are allocated."
+    >
       <template #actions>
-        <button type="button" class="inline-flex items-center justify-center rounded-2xl bg-[var(--color-accent,#000000)] px-5 py-3 text-sm font-semibold text-white" @click="showForm = !showForm">{{ showForm ? 'Close form' : 'Create invoice' }}</button>
+        <button 
+          type="button" 
+          class="inline-flex items-center justify-center rounded-2xl bg-[var(--color-accent,#000000)] px-5 py-3 text-sm font-semibold text-white touch-manipulation transition-all duration-200 hover:bg-[var(--color-text,#1E293B)] active:scale-95"
+          @click="openInvoiceForm"
+        >
+          {{ showForm ? 'Close form' : 'Create invoice' }}
+        </button>
       </template>
     </FinancePageHeader>
 
@@ -19,69 +29,206 @@
       @submit="submitInvoice"
       @cancel="showForm = false"
     />
-    <p v-if="store.error" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ store.error }}</p>
-    <FinanceStatePanel v-if="showLoadingState" tone="loading" eyebrow="Loading invoices" title="Loading invoices" message="Fetching invoice rows for the active range." />
-    <FinanceStatePanel v-else-if="showEmptyState" eyebrow="Invoices" title="No invoices found" message="Create an invoice from CRM or directly from finance." />
+    
+    <p 
+      v-if="store.error" 
+      class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+    >
+      {{ store.error }}
+    </p>
+    
+    <FinanceStatePanel 
+      v-if="showLoadingState" 
+      tone="loading" 
+      eyebrow="Loading invoices" 
+      title="Loading invoices" 
+      message="Fetching invoice rows for the active range." 
+    />
+    
+    <FinanceStatePanel 
+      v-else-if="showEmptyState" 
+      eyebrow="Invoices" 
+      title="No invoices found" 
+      message="Create an invoice from CRM or directly from finance." 
+    />
 
     <div v-else class="grid gap-5">
-      <article v-for="invoice in sortedInvoices" :key="invoice.id" class="rounded-[28px] border border-[var(--color-neutral-dark,#E2E8F0)] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.05)]">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div class="flex flex-wrap items-center gap-3">
-              <p class="text-xl font-semibold text-[var(--color-text,#0F172A)]">{{ invoice.invoiceCode }}</p>
-              <FinanceStatusBadge :status="invoice.status || 'draft'" />
+      <article 
+        v-for="invoice in sortedInvoices" 
+        :key="invoice.id" 
+        class="group relative rounded-[28px] border border-[var(--color-neutral-dark,#E2E8F0)] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.05)] transition-all duration-200 hover:shadow-[0_20px_56px_rgba(15,23,42,0.08)]"
+      >
+        <!-- Status indicator bar -->
+        <div 
+          class="absolute top-0 left-0 right-0 h-1 rounded-t-[28px]"
+          :class="{
+            'bg-[#10B981]': invoice.status === 'issued' || invoice.status === 'paid',
+            'bg-[#F59E0B]': invoice.status === 'draft',
+            'bg-[#EF4444]': invoice.status === 'cancelled' || invoice.status === 'overdue',
+            'bg-[#8B5CF6]': invoice.status === 'partial'
+          }"
+        />
+
+        <!-- Primary Information Row -->
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <!-- Left: Client & Reference Info -->
+          <div class="flex-1 min-w-0">
+            <!-- Client Name -->
+            <div class="flex items-start gap-2">
+              <h3 class="text-lg font-semibold text-[var(--color-text,#0F172A)] truncate">
+                {{ invoice.clientLabel || invoice.clientId || 'Unnamed Client' }}
+              </h3>
+              <FinanceStatusBadge 
+                :status="invoice.status || 'draft'" 
+                class="flex-shrink-0 mt-0.5"
+              />
             </div>
-            <p class="mt-2 text-sm text-[var(--color-text-light,#64748B)]">{{ invoice.clientLabel || invoice.clientId }} · {{ invoice.engagementCode || invoice.engagementId || 'No engagement' }}</p>
-            <p class="mt-2 text-xs uppercase tracking-[0.22em] text-[var(--color-text-light,#64748B)]">Due {{ formatDate(invoice.dueDate) }}</p>
+
+            <!-- Invoice Code & Reference -->
+            <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <span class="font-mono text-[var(--color-text-light,#64748B)]">
+                {{ invoice.invoiceCode }}
+              </span>
+              <span class="text-[var(--color-neutral-dark,#CBD5E1)]">·</span>
+              <span class="text-[var(--color-text-light,#64748B)]">
+                {{ invoice.engagementCode || invoice.engagementId || 'No engagement' }}
+              </span>
+            </div>
+
+            <!-- Due Date & Meta -->
+            <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span class="flex items-center gap-1.5 text-[var(--color-text-light,#64748B)]">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>Due {{ formatDate(invoice.dueDate) }}</span>
+              </span>
+              <span class="text-[var(--color-neutral-dark,#CBD5E1)]">|</span>
+              <span class="flex items-center gap-1.5 text-[var(--color-text-light,#64748B)]">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Issued {{ formatDate(invoice.issueDate || invoice.createdAt) }}</span>
+              </span>
+            </div>
           </div>
-          <div class="grid gap-2 text-right text-sm text-[var(--color-text-light,#64748B)]">
-            <p><span class="font-semibold text-[var(--color-text,#0F172A)]">{{ formatMoney(invoice.totalAmount, invoice.currency || 'NAD') }}</span></p>
-            <p>Paid {{ formatMoney(invoice.allocatedAmount || invoice.paidAmount, invoice.currency || 'NAD') }}</p>
-            <p>Balance {{ formatMoney(invoice.balanceAmount, invoice.currency || 'NAD') }}</p>
+
+          <!-- Right: Financial Summary -->
+          <div class="flex-shrink-0">
+            <div class="text-right">
+              <!-- Total Amount -->
+              <p class="text-2xl font-bold text-[var(--color-text,#0F172A)]">
+                {{ formatMoney(invoice.totalAmount, invoice.currency || 'NAD') }}
+              </p>
+              
+              <!-- Payment Status -->
+              <div class="mt-1 flex items-center justify-end gap-3 text-sm">
+                <span class="flex items-center gap-1 text-[var(--color-text-light,#64748B)]">
+                  <span class="text-xs">Paid</span>
+                  <span class="font-medium text-[var(--color-text,#0F172A)]">
+                    {{ formatMoney(invoice.allocatedAmount || invoice.paidAmount || 0, invoice.currency || 'NAD') }}
+                  </span>
+                </span>
+                <span class="text-[var(--color-neutral-dark,#CBD5E1)]">|</span>
+                <span class="flex items-center gap-1">
+                  <span class="text-xs text-[var(--color-text-light,#64748B)]">Balance</span>
+                  <span class="font-medium" :class="{
+                    'text-[#10B981]': (invoice.balanceAmount || 0) <= 0,
+                    'text-[#EF4444]': (invoice.balanceAmount || 0) > 0
+                  }">
+                    {{ formatMoney(invoice.balanceAmount || invoice.totalAmount - (invoice.allocatedAmount || invoice.paidAmount || 0), invoice.currency || 'NAD') }}
+                  </span>
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="mt-5 flex flex-wrap justify-end gap-3">
-          
-          <button v-if="['draft', 'issued'].includes(invoice.status) && Number(invoice.allocatedAmount || 0) === 0" type="button" class="rounded-2xl border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-700 disabled:opacity-60" :disabled="store.isLoading" @click="store.cancelInvoice(invoice, { reason: 'Cancelled from finance invoices page' })">Cancel</button>
+
+        <!-- Line Items Preview -->
+        <div v-if="invoice.lineItems && invoice.lineItems.length" class="mt-4 border-t border-[var(--color-neutral,#F1F5F9)] pt-3">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-text-light,#64748B)]">
+            <span class="font-medium text-[var(--color-text,#0F172A)]">Items:</span>
+            <span>{{ invoice.lineItems.length }} item{{ invoice.lineItems.length > 1 ? 's' : '' }}</span>
+            <span class="text-[var(--color-neutral-dark,#CBD5E1)]">·</span>
+            <span class="truncate max-w-[200px] sm:max-w-[300px] md:max-w-[400px]">
+              {{ invoice.lineItems.map(item => item.description || item.name).join(' • ') }}
+            </span>
+          </div>
         </div>
 
-        <div class="mt-5 flex flex-wrap justify-end gap-3">
-  <button
-    type="button"
-    class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2 text-xs font-semibold text-[var(--color-text,#0F172A)] disabled:opacity-60"
-    :disabled="store.isLoading"
-    @click="handleDownloadInvoice(invoice)"
-  >
-    Download PDF
-  </button>
+        <!-- Action Buttons -->
+        <div class="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-neutral,#F1F5F9)] pt-4">
+          <!-- Download Button -->
+          <button
+            type="button"
+            class="download-btn inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-[var(--color-text,#1E293B)] hover:shadow-md active:scale-95 disabled:opacity-60 disabled:active:scale-100 touch-manipulation select-none"
+            :disabled="store.isLoading || isDownloading[invoice.id]"
+            @click="handleDownloadInvoice(invoice)"
+            @touchend.prevent="handleDownloadInvoice(invoice)"
+          >
+            <span class="flex items-center gap-2">
+              <svg 
+                v-if="!isDownloading[invoice.id]" 
+                class="w-4 h-4" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <svg 
+                v-else 
+                class="w-4 h-4 animate-spin" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span>{{ isDownloading[invoice.id] ? 'Downloading...' : 'Download PDF' }}</span>
+            </span>
+          </button>
 
-  <button
-    v-if="invoice.status === 'draft'"
-    type="button"
-    class="rounded-2xl bg-[var(--color-primary,#1860A8)] px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
-    :disabled="store.isLoading"
-    @click="store.issueInvoice(invoice)"
-  >
-    Issue
-  </button>
+          <!-- Issue Button -->
+          <button
+            v-if="invoice.status === 'draft'"
+            type="button"
+            class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-[var(--color-primary,#1860A8)] px-4 py-2.5 text-sm font-medium text-[var(--color-primary,#1860A8)] transition-all duration-200 hover:bg-[var(--color-primary,#1860A8)] hover:text-white active:scale-95 disabled:opacity-60 disabled:active:scale-100 touch-manipulation select-none"
+            :disabled="store.isLoading"
+            @click="store.issueInvoice(invoice)"
+          >
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span>Issue</span>
+            </span>
+          </button>
 
-  <button
-    v-if="['draft', 'issued'].includes(invoice.status) && Number(invoice.allocatedAmount || 0) === 0"
-    type="button"
-    class="rounded-2xl border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-700 disabled:opacity-60"
-    :disabled="store.isLoading"
-    @click="store.cancelInvoice(invoice, { reason: 'Cancelled from finance invoices page' })"
-  >
-    Cancel
-  </button>
-</div>
+          <!-- Cancel Button -->
+          <button
+            v-if="['draft', 'issued'].includes(invoice.status) && Number(invoice.allocatedAmount || 0) === 0"
+            type="button"
+            class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl border border-rose-200 px-4 py-2.5 text-sm font-medium text-rose-600 transition-all duration-200 hover:bg-rose-50 active:scale-95 disabled:opacity-60 disabled:active:scale-100 touch-manipulation select-none"
+            :disabled="store.isLoading"
+            @click="store.cancelInvoice(invoice, { reason: 'Cancelled from finance invoices page' })"
+          >
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Cancel</span>
+            </span>
+          </button>
+        </div>
       </article>
     </div>
   </section>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, reactive } from 'vue'
 import FinanceInvoiceForm from '../components/FinanceInvoiceForm.vue'
 import FinancePageHeader from '../components/FinancePageHeader.vue'
 import FinanceStatePanel from '../components/FinanceStatePanel.vue'
@@ -92,19 +239,27 @@ import { downloadInvoicePdf } from '../services/invoicePdfService.js'
 import { useAppStore } from '@app/stores/appStore'
 
 const store = useFinanceAppStore()
-store.ensureReady('invoices')
-
-const showForm = ref(false)
-const showLoadingState = computed(() => store.isLoading && !store.invoices.length)
-const showEmptyState = computed(() => !store.isLoading && !store.error && !store.invoices.length)
-const sortedInvoices = computed(() => [...store.invoices].sort((a, b) => String(b.issueDate || '').localeCompare(String(a.issueDate || ''))))
-
 const st = useAppStore()
+
+store.ensureReady('invoices')
 
 const CLIENT_PAGE_SIZE = 150
 
+const showForm = ref(false)
 const isLoadingClients = ref(false)
 const isLoadingEngagements = ref(false)
+const isDownloading = reactive({})
+
+const showLoadingState = computed(() => store.isLoading && !store.invoices.length)
+const showEmptyState = computed(() => !store.isLoading && !store.error && !store.invoices.length)
+
+const sortedInvoices = computed(() => {
+  return [...store.invoices].sort((a, b) => {
+    return String(b.issueDate || b.createdAt || '').localeCompare(
+      String(a.issueDate || a.createdAt || ''),
+    )
+  })
+})
 
 const clientOptions = computed(() => normalizeRows(st.clients?.items || []))
 const engagementOptions = computed(() => normalizeRows(st.engagements?.items || []))
@@ -143,9 +298,7 @@ function clientListQuery(append = false) {
   return {
     append,
     limit: CLIENT_PAGE_SIZE,
-    filters: [
-     
-    ],
+    filters: [],
     orderBy: [
       { field: 'createdAt', direction: 'desc' },
     ],
@@ -223,10 +376,24 @@ async function submitInvoice(payload) {
 }
 
 async function handleDownloadInvoice(invoice) {
+  // Prevent multiple simultaneous downloads
+  if (isDownloading[invoice.id]) return
+
+  // Set loading state for this specific invoice
+  isDownloading[invoice.id] = true
+
   try {
+    // Add a small delay to ensure the loading state is rendered
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
     await downloadInvoicePdf(invoice)
+    
+    console.log('[finance] Invoice PDF downloaded successfully:', invoice.id)
   } catch (error) {
     console.error('[finance] Failed to download invoice PDF:', error)
+    alert('Failed to download PDF. Please try again.')
+  } finally {
+    isDownloading[invoice.id] = false
   }
 }
 
@@ -234,3 +401,63 @@ onMounted(async () => {
   await loadInitialClients()
 })
 </script>
+
+<style scoped>
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 640px) {
+  .download-btn,
+  button {
+    min-height: 48px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    font-size: 14px !important;
+  }
+
+  .flex-wrap {
+    gap: 0.75rem !important;
+  }
+
+  article {
+    position: relative;
+  }
+
+  button:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+}
+
+@media (min-width: 641px) {
+  .download-btn:hover {
+    background-color: var(--color-secondary, #F8FAFC);
+    border-color: var(--color-text-light, #64748B);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 0.8s linear infinite;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-primary, #1860A8);
+  outline-offset: 2px;
+}
+
+.select-none {
+  -webkit-user-select: none;
+  user-select: none;
+}
+</style>

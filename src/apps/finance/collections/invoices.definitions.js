@@ -32,6 +32,7 @@ export default defineCollection({
     paidAmount: { type: FIELD_TYPES.NUMBER, required: false, filterable: true, sortable: true },
     balanceAmount: { type: FIELD_TYPES.NUMBER, required: true, filterable: true, sortable: true },
     lineItems: { type: FIELD_TYPES.ARRAY, required: false },
+    _manualClientData: { type: FIELD_TYPES.ANY, required: false },
     notes: { type: FIELD_TYPES.STRING, required: false, searchable: true },
     terms: { type: FIELD_TYPES.STRING, required: false, searchable: true },
     sourceModule: { type: FIELD_TYPES.STRING, required: false, filterable: true },
@@ -53,6 +54,7 @@ export default defineCollection({
   writableFields: [
     'invoiceCode',
     'clientId',
+    '_manualClientData',
     'clientLabel',
     'engagementId',
     'engagementCode',
@@ -92,6 +94,7 @@ export default defineCollection({
     'subtotalAmount',
     'discountAmount',
     'taxAmount',
+    '_manualClientData',
     'totalAmount',
     'allocatedAmount',
     'paidAmount',

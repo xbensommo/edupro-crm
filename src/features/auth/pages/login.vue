@@ -2,7 +2,7 @@
   <AuthCard
     eyebrow="Welcome back"
     title="Sign in to your workspace"
-    description="Use your email and password or continue with one of the enabled providers. New accounts require an invitation."
+    description="Use your email and password. New accounts require an invitation."
   >
     <form class="space-y-5" @submit.prevent="handleSubmit">
       <AuthField
@@ -26,23 +26,13 @@
         <RouterLink class="font-semibold text-soft transition hover:text-primary" to="/auth/forgot-password">
           Forgot password?
         </RouterLink>
-        <RouterLink class="font-semibold text-soft transition hover:text-primary" to="/auth/register">
-          Invitation required
-        </RouterLink>
+        
       </div>
 
       <button type="submit" class="btn-primary w-full" :disabled="loading">
         {{ loading ? 'Signing in...' : 'Sign in' }}
       </button>
     </form>
-
-    <div v-if="socialProviders.length" class="mt-8 border-t border-theme pt-6">
-      <div class="mb-4 flex items-center justify-between gap-3">
-        <p class="text-caption">Or continue with</p>
-        <span class="h-px flex-1 bg-[var(--color-border)]"></span>
-      </div>
-      <SocialAuthButtons :loading="loading" :providers="socialProviders" @select="handleSocial" />
-    </div>
   </AuthCard>
 </template>
 

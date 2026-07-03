@@ -408,6 +408,7 @@ export default defineCollection({
     'cancelledAt',
     'cancelledByUserId',
     'cancellationReason',
+    'updatedAt'
   ],
 
   primaryKey: {

@@ -3,7 +3,9 @@
     <section class="auth-brand-panel">
       <div class="relative z-10 flex w-full flex-col justify-between">
         <div class="max-w-xl">
-          <p class="section-label mb-5 border-white/10 bg-white/10 text-white">toti-crm</p>
+          <p class="section-label mb-5 border-white/10 bg-white/10 text-white">
+              EduPro LIC
+          </p>
           <h1 class="display-section max-w-lg text-white md:text-6xl">
             Secure access for EduPro LIC Team.
           </h1>
@@ -14,7 +16,9 @@
           
           <article class="rounded-[1.5rem] border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
             <p class="text-caption text-white/55">Maintained BY</p>
-            <p class="mt-2 text-sm font-semibold text-white">TotiSoft Cc.</p>
+            <p class="mt-2 text-sm font-semibold text-white">
+              <a href="https://www.totisoft.com" target="_blank">TotiSoft Cc</a>
+            </p>
           </article>
         </div>
         </div>

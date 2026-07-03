@@ -2,328 +2,459 @@
   <Teleport to="body">
     <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/55 p-4">
       <form
-        class="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-[var(--color-neutral-dark,#E2E8F0)] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.22)]"
+        class="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-[var(--color-neutral-dark,#E2E8F0)] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]"
         @submit.prevent="submit"
       >
-        <div class="mb-6 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-[var(--color-primary,#1860A8)]">
-              Client estimate
-            </p>
+        <!-- Close button - top right -->
+        <button
+          type="button"
+          class="absolute top-4 right-4 rounded-full p-2 text-[var(--color-text-light,#64748B)] transition-colors hover:bg-[var(--color-neutral,#F8FAFC)] hover:text-[var(--color-text,#0F172A)]"
+          :disabled="isSubmitting"
+          @click="$emit('cancel')"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
 
-            <h2 class="mt-2 text-2xl font-semibold tracking-tight text-[var(--color-text,#0F172A)]">
-              Create quotation
-            </h2>
+        <!-- Header -->
+        <div class="border-b border-[var(--color-neutral,#F1F5F9)] p-6">
+          <div class="flex items-start gap-4">
+            <div class="flex-1">
+              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-primary,#1860A8)]">
+                <span class="flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Client Estimate
+                </span>
+              </p>
 
-            <p class="mt-2 text-sm leading-7 text-[var(--color-text-light,#64748B)]">
-              Create a quotation using a manual client or an existing client record.
-            </p>
+              <h2 class="mt-1.5 text-2xl font-semibold tracking-tight text-[var(--color-text,#0F172A)]">
+                Create Quotation
+              </h2>
+
+              <p class="mt-1 text-sm text-[var(--color-text-light,#64748B)]">
+                Fill in the details below to generate a professional quotation for your client.
+              </p>
+            </div>
           </div>
-
-          <button
-            type="button"
-            class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-5 py-3 text-sm font-semibold"
-            :disabled="isSubmitting"
-            @click="$emit('cancel')"
-          >
-            Close
-          </button>
         </div>
 
-        <div class="grid gap-5">
-          <section class="grid gap-4 rounded-[24px] bg-[var(--color-neutral,#F8FAFC)] p-5">
-            <div class="flex flex-wrap gap-3">
-              <button
-                type="button"
-                class="rounded-2xl px-4 py-2 text-sm font-semibold"
-                :class="clientMode === 'manual' ? 'bg-[var(--color-accent,#000000)] text-white' : 'border border-[var(--color-neutral-dark,#E2E8F0)] text-[var(--color-text,#0F172A)]'"
-                @click="setClientMode('manual')"
-              >
-                Manual client
-              </button>
+        <!-- Form Body -->
+        <div class="p-6">
+          <div class="space-y-6">
+            <!-- Section 1: Client Selection -->
+            <section class="space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="h-6 w-1 rounded-full bg-[var(--color-primary,#1860A8)]"></div>
+                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Client Information</h3>
+                <span class="text-xs text-[var(--color-text-light,#64748B)]">Who is this quotation for?</span>
+              </div>
 
-              <button
-                type="button"
-                class="rounded-2xl px-4 py-2 text-sm font-semibold"
-                :class="clientMode === 'existing' ? 'bg-[var(--color-accent,#000000)] text-white' : 'border border-[var(--color-neutral-dark,#E2E8F0)] text-[var(--color-text,#0F172A)]'"
-                @click="setClientMode('existing')"
-              >
-                Existing client
-              </button>
-            </div>
-
-            <div v-if="clientMode === 'manual'" class="grid gap-4 md:grid-cols-2">
-              <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-                Client name
-                <input
-                  v-model.trim="manualClient.name"
-                  required
-                  class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                  placeholder="Client name"
+              <!-- Client Mode Toggle -->
+              <div class="flex flex-wrap gap-2 p-1 bg-[var(--color-neutral,#F8FAFC)] rounded-2xl w-fit">
+                <button
+                  type="button"
+                  class="rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200"
+                  :class="clientMode === 'manual' ? 'bg-white shadow-sm text-[var(--color-text,#0F172A)]' : 'text-[var(--color-text-light,#64748B)] hover:text-[var(--color-text,#0F172A)]'"
+                  @click="setClientMode('manual')"
                 >
-              </label>
-
-              <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-                Client number / reference
-                <input
-                  v-model.trim="manualClient.number"
-                  class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                  placeholder="Optional"
-                >
-              </label>
-
-              <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-                Client email
-                <input
-                  v-model.trim="manualClient.email"
-                  type="email"
-                  class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                  placeholder="client@email.com"
-                >
-              </label>
-
-              <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-                Client phone
-                <input
-                  v-model.trim="manualClient.phone"
-                  class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                  placeholder="+264..."
-                >
-              </label>
-            </div>
-
-            <div v-else class="grid gap-4 md:grid-cols-2">
-              <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-                Client
-
-                <select
-                  v-model="selectedClientId"
-                  required
-                  class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                  @change="handleClientChange"
-                >
-                  <option value="" disabled>Select client</option>
-
-                  <option
-                    v-for="client in normalizedClients"
-                    :key="client.id"
-                    :value="client.id"
-                  >
-                    {{ client.label }}
-                  </option>
-                </select>
+                  <span class="flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Manual
+                  </span>
+                </button>
 
                 <button
                   type="button"
-                  :disabled="isLoadingClients || !canLoadMoreClients"
-                  class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2 text-sm font-semibold text-[var(--color-text,#0F172A)] disabled:cursor-not-allowed disabled:opacity-50"
-                  @click="$emit('load-more-clients')"
+                  class="rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200"
+                  :class="clientMode === 'existing' ? 'bg-white shadow-sm text-[var(--color-text,#0F172A)]' : 'text-[var(--color-text-light,#64748B)] hover:text-[var(--color-text,#0F172A)]'"
+                  @click="setClientMode('existing')"
                 >
-                  {{ isLoadingClients ? 'Loading clients...' : 'Load more clients' }}
+                  <span class="flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Existing
+                  </span>
                 </button>
-              </label>
+              </div>
 
-              <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-                Engagement
-
-                <select
-                  v-model="selectedEngagementId"
-                  :disabled="!selectedClientId || isLoadingEngagements"
-                  class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)] disabled:opacity-60"
-                  @change="handleEngagementChange"
-                >
-                  <option value="">
-                    {{ selectedClientId ? 'No engagement / select one' : 'Select client first' }}
-                  </option>
-
-                  <option
-                    v-for="engagement in filteredEngagements"
-                    :key="engagement.id"
-                    :value="engagement.id"
+              <!-- Manual Client Fields -->
+              <div v-if="clientMode === 'manual'" class="grid gap-4 sm:grid-cols-2">
+                <div class="sm:col-span-2">
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Client Name <span class="text-rose-500">*</span>
+                  </label>
+                  <input
+                    v-model.trim="manualClient.name"
+                    required
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="e.g., John Doe or Company Name"
                   >
-                    {{ engagement.label }}
-                  </option>
-                </select>
-              </label>
-            </div>
-          </section>
+                </div>
 
-          <section class="grid gap-4 md:grid-cols-2">
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Quotation code
-              <input
-                v-model.trim="form.quoteCode"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                placeholder="Leave blank to auto-generate if your store supports it"
-              >
-            </label>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Email Address
+                  </label>
+                  <input
+                    v-model.trim="manualClient.email"
+                    type="email"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="client@example.com"
+                  >
+                </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Status
-              <select
-                v-model="form.status"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-              >
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-              </select>
-            </label>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Phone Number
+                  </label>
+                  <input
+                    v-model.trim="manualClient.phone"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="+264 81 123 4567"
+                  >
+                </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Quote date
-              <input
-                v-model="form.quoteDate"
-                type="date"
-                required
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-              >
-            </label>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Client Number
+                  </label>
+                  <input
+                    v-model.trim="manualClient.number"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="Optional reference"
+                  >
+                </div>
+              </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Valid until
-              <input
-                v-model="form.validUntil"
-                type="date"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-              >
-            </label>
+              <!-- Existing Client Fields -->
+              <div v-else class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Select Client <span class="text-rose-500">*</span>
+                  </label>
+                  <div class="flex gap-2">
+                    <select
+                      v-model="selectedClientId"
+                      required
+                      class="flex-1 rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                      @change="handleClientChange"
+                    >
+                      <option value="" disabled>Select a client...</option>
+                      <option
+                        v-for="client in normalizedClients"
+                        :key="client.id"
+                        :value="client.id"
+                      >
+                        {{ client.label }}
+                      </option>
+                    </select>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Reference label
-              <input
-                v-model.trim="form.referenceLabel"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                placeholder="Project / Engagement / Service"
-              >
-            </label>
+                    <button
+                      v-if="canLoadMoreClients"
+                      type="button"
+                      class="rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-3 py-2.5 text-sm text-[var(--color-text-light,#64748B)] transition-colors hover:bg-[var(--color-neutral,#F8FAFC)] hover:text-[var(--color-text,#0F172A)] disabled:opacity-50"
+                      :disabled="isLoadingClients"
+                      @click="$emit('load-more-clients')"
+                    >
+                      <svg class="w-5 h-5" :class="isLoadingClients ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Reference value
-              <input
-                v-model.trim="form.referenceValue"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                placeholder="Website development, academic service, etc."
-              >
-            </label>
-          </section>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Engagement
+                  </label>
+                  <select
+                    v-model="selectedEngagementId"
+                    :disabled="!selectedClientId || isLoadingEngagements"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20 disabled:opacity-50"
+                    @change="handleEngagementChange"
+                  >
+                    <option value="">
+                      {{ selectedClientId ? 'No engagement / select one' : 'Select client first' }}
+                    </option>
+                    <option
+                      v-for="engagement in filteredEngagements"
+                      :key="engagement.id"
+                      :value="engagement.id"
+                    >
+                      {{ engagement.label }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </section>
 
-          <section class="grid gap-4 md:grid-cols-2">
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)] md:col-span-2">
-              Description
-              <input
-                v-model.trim="line.description"
-                required
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                placeholder="Service / product / project description"
-              >
-            </label>
+            <!-- Section 2: Quotation Details -->
+            <section class="space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="h-6 w-1 rounded-full bg-[var(--color-primary,#1860A8)]"></div>
+                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Quotation Details</h3>
+                <span class="text-xs text-[var(--color-text-light,#64748B)]">Set the scope and terms</span>
+              </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Quantity
-              <input
-                v-model.number="line.quantity"
-                type="number"
-                min="1"
-                step="1"
-                required
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-              >
-            </label>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <!-- <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Quotation Code
+                  </label>
+                  <input
+                    v-model.trim="form.quoteCode"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="Auto-generated if left blank"
+                  >
+                </div> -->
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Unit price
-              <input
-                v-model.number="line.unitPrice"
-                type="number"
-                min="0"
-                step="0.01"
-                required
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-              >
-            </label>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Status <span class="text-rose-500">*</span>
+                  </label>
+                  <select
+                    v-model="form.status"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="sent">Sent</option>
+                  </select>
+                </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Discount
-              <input
-                v-model.number="form.discountAmount"
-                type="number"
-                min="0"
-                step="0.01"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-              >
-            </label>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Quote Date <span class="text-rose-500">*</span>
+                  </label>
+                  <input
+                    v-model="form.quoteDate"
+                    type="date"
+                    required
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Deposit required
-              <input
-                v-model.number="form.depositAmount"
-                type="number"
-                min="0"
-                step="0.01"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-              >
-            </label>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Valid Until
+                  </label>
+                  <input
+                    v-model="form.validUntil"
+                    type="date"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)]">
-              Currency
-              <select
-                v-model="form.currency"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-              >
-                <option value="NAD">NAD</option>
-                <option value="ZAR">ZAR</option>
-                <option value="USD">USD</option>
-              </select>
-            </label>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Reference Label
+                  </label>
+                  <input
+                    v-model.trim="form.referenceLabel"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="e.g., Project, Service, Engagement"
+                  >
+                </div>
 
-            <div class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] bg-[var(--color-neutral,#F8FAFC)] p-4">
-              <p class="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-text-light,#64748B)]">
-                Estimated total
-              </p>
-              <p class="mt-2 text-xl font-semibold text-[var(--color-text,#0F172A)]">
-                {{ estimatedTotalText }}
-              </p>
-            </div>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Reference Value
+                  </label>
+                  <input
+                    v-model.trim="form.referenceValue"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="e.g. Assignment Proofreading"
+                  >
+                </div>
+              </div>
+            </section>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)] md:col-span-2">
-              Notes
-              <textarea
-                v-model.trim="form.notes"
-                rows="3"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                placeholder="Optional quotation notes"
-              />
-            </label>
+            <!-- Section 3: Line Items & Pricing -->
+            <section class="space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="h-6 w-1 rounded-full bg-[var(--color-primary,#1860A8)]"></div>
+                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Line Items & Pricing</h3>
+                <span class="text-xs text-[var(--color-text-light,#64748B)]">What are you quoting for?</span>
+              </div>
 
-            <label class="grid gap-2 text-sm font-semibold text-[var(--color-text,#0F172A)] md:col-span-2">
-              Terms
-              <textarea
-                v-model.trim="termsText"
-                rows="3"
-                class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-3 text-sm font-normal outline-none focus:border-[var(--color-primary,#1860A8)]"
-                placeholder="One term per line"
-              />
-            </label>
-          </section>
+              <div class="grid gap-4 sm:grid-cols-3">
+                <div class="sm:col-span-3">
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Description <span class="text-rose-500">*</span>
+                  </label>
+                  <input
+                    v-model.trim="line.description"
+                    required
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="What product or service are you quoting?"
+                  >
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Quantity <span class="text-rose-500">*</span>
+                  </label>
+                  <input
+                    v-model.number="line.quantity"
+                    type="number"
+                    min="1"
+                    step="1"
+                    required
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Unit Price <span class="text-rose-500">*</span>
+                  </label>
+                  <input
+                    v-model.number="line.unitPrice"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Currency
+                  </label>
+                  <select
+                    v-model="form.currency"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                    <option value="NAD">NAD</option>
+                    <option value="ZAR">ZAR</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Financial Summary Card -->
+              <div class="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Discount
+                  </label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-light,#64748B)]">{{ form.currency }}</span>
+                    <input
+                      v-model.number="form.discountAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] pl-8 pr-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                      placeholder="0.00"
+                    >
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Deposit Required
+                  </label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-light,#64748B)]">{{ form.currency }}</span>
+                    <input
+                      v-model.number="form.depositAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] pl-8 pr-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                      placeholder="0.00"
+                    >
+                  </div>
+                </div>
+
+                <div class="rounded-xl bg-[var(--color-primary,#1860A8)]/5 border border-[var(--color-primary,#1860A8)]/20 p-4 flex flex-col justify-center">
+                  <p class="text-xs font-medium uppercase tracking-[0.12em] text-[var(--color-primary,#1860A8)]">
+                    Estimated Total
+                  </p>
+                  <p class="mt-1 text-2xl font-bold text-[var(--color-primary,#1860A8)]">
+                    {{ estimatedTotalText }}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <!-- Section 4: Terms & Notes -->
+            <section class="space-y-4">
+              <div class="flex items-center gap-3">
+                <div class="h-6 w-1 rounded-full bg-[var(--color-primary,#1860A8)]"></div>
+                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Terms & Notes</h3>
+                <span class="text-xs text-[var(--color-text-light,#64748B)]">Additional information</span>
+              </div>
+
+              <div class="grid gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Notes
+                  </label>
+                  <textarea
+                    v-model.trim="form.notes"
+                    rows="2"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20 resize-none"
+                    placeholder="Any additional notes for this quotation"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Terms & Conditions
+                  </label>
+                  <textarea
+                    v-model.trim="termsText"
+                    rows="3"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20 resize-none font-mono text-xs"
+                    placeholder="Enter each term on a new line&#10;e.g.,&#10;50% deposit is required before work begins&#10;Final payment due upon completion"
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
 
-        <div class="mt-6 flex flex-wrap justify-end gap-3">
-          <button
-            type="button"
-            class="rounded-2xl border border-[var(--color-neutral-dark,#E2E8F0)] px-5 py-3 text-sm font-semibold"
-            :disabled="isSubmitting"
-            @click="$emit('cancel')"
-          >
-            Cancel
-          </button>
+        <!-- Footer -->
+        <div class="border-t border-[var(--color-neutral,#F1F5F9)] p-6 bg-[var(--color-neutral,#F8FAFC)] rounded-b-[32px]">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <p class="text-xs text-[var(--color-text-light,#64748B)]">
+              <span class="font-medium text-[var(--color-text,#0F172A)]">{{ estimatedTotalText }}</span> estimated total
+            </p>
 
-          <button
-            type="submit"
-            class="rounded-2xl bg-[var(--color-accent,#000000)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
-            :disabled="isSubmitting"
-          >
-            {{ isSubmitting ? 'Saving...' : 'Create quotation' }}
-          </button>
+            <div class="flex flex-wrap gap-3">
+              <button
+                type="button"
+                class="rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] bg-white px-5 py-2.5 text-sm font-medium text-[var(--color-text,#0F172A)] transition-colors hover:bg-[var(--color-neutral,#F8FAFC)] disabled:opacity-50"
+                :disabled="isSubmitting"
+                @click="$emit('cancel')"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                class="rounded-xl bg-[var(--color-accent,#000000)] px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-[var(--color-text,#1E293B)] hover:shadow-md active:scale-95 disabled:opacity-60 disabled:active:scale-100 flex items-center gap-2"
+                :disabled="isSubmitting"
+              >
+                <svg v-if="!isSubmitting" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <svg v-else class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {{ isSubmitting ? 'Creating...' : 'Create Quotation' }}
+              </button>
+            </div>
+          </div>
         </div>
       </form>
     </div>
@@ -596,3 +727,58 @@ function submit() {
   })
 }
 </script>
+
+<style scoped>
+/* Smooth scroll for the form container */
+.max-h-\[92vh\] {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar styling */
+.max-h-\[92vh\]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.max-h-\[92vh\]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.max-h-\[92vh\]::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-dark, #E2E8F0);
+  border-radius: 9999px;
+}
+
+.max-h-\[92vh\]::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-light, #94A3B8);
+}
+
+/* Hide number input arrows */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Smooth transitions */
+input, select, textarea, button {
+  transition: all 0.2s ease;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 0.8s linear infinite;
+}
+</style>

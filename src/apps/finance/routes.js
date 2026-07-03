@@ -62,13 +62,13 @@ export default [
   },
   {
     path: '/finance/invoices',
-    name: 'FinanceInvoices',
+    name: 'Invoices',
     component: FinanceInvoicesPage,
     meta: {
       title: 'Finance Invoices',
       requiresAuth: true,
-      feature: 'finance',
-      app: 'finance',
+      feature: 'Billing',
+      app: 'Billing',
       permission: 'finance.invoice.read',
       roles: ['admin', 'receptionist'],
     }
@@ -80,8 +80,8 @@ export default [
     meta: {
       title: 'Quotation',
       requiresAuth: true,
-      feature: 'quotation',
-      app: 'quotation',
+      feature: 'Billing',
+      app: 'Billing',
       permission: 'finance.quotation.read',
       roles: ['admin', 'receptionist'],
     },

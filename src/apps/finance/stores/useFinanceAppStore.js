@@ -422,11 +422,12 @@ async function markQuotationSent(recordOrId) {
         throw new Error('[finance] Missing generated collection actions for "quotations".')
       }
 
+      console.trace(payload)
+
       return await actions.update(target.id, {
         status: 'cancelled',
         cancellationReason: payload.reason || 'Quotation cancelled.',
         cancelledAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       })
     })
   }
