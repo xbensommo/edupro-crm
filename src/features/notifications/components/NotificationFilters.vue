@@ -32,12 +32,12 @@ function update(name, value) {
 
     <select :value="modelValue.type || ''" class="input-base" @change="update('type', $event.target.value)">
       <option value="">All types</option>
-      <option value="system">System</option>
+      <!-- <option value="system">System</option>
       <option value="auth">Auth</option>
       <option value="crm">CRM</option>
       <option value="workflow">Workflow</option>
       <option value="finance">Finance</option>
-      <option value="client_records">Client records</option>
+      <option value="client_records">Client records</option> -->
     </select>
 
     <select :value="modelValue.channel || ''" class="input-base" @change="update('channel', $event.target.value)">
@@ -45,7 +45,7 @@ function update(name, value) {
       <option value="in_app">In-app</option>
       <option value="email">Email</option>
       <option value="push">Push / FCM</option>
-      <option value="whatsapp">WhatsApp</option>
+      <!-- <option value="whatsapp">WhatsApp</option> -->
     </select>
 
     <select
@@ -55,12 +55,12 @@ function update(name, value) {
       @change="update('status', $event.target.value)"
     >
       <option value="">All statuses</option>
-      <option value="queued">Queued</option>
+      <!-- <option value="queued">Queued</option> -->
       <option value="pending">Pending</option>
-      <option value="sent">Sent</option>
-      <option value="failed">Failed</option>
+      <!-- <option value="sent">Sent</option> -->
+      <!-- <option value="failed">Failed</option> -->
       <option value="read">Read</option>
-      <option value="archived">Archived</option>
+      <!-- <option value="archived">Archived</option> -->
     </select>
 
     <label class="filter-toggle inline-flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm font-medium">

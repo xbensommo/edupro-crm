@@ -927,6 +927,8 @@ export function createCrmService() {
     await safeAdd('finance_transactions', {
       type: 'adjustment',
       status: 'draft',
+      consultantName: engagement.consultantName,
+      assignedConsultantInfo: engagement.assignedConsultantInfo,
       reference: engagement.engagementCode || engagement.id || '',
       memo: `CRM ${mode}: ${engagement.title || 'Work item'}`,
       occurredOn: createdAt,
@@ -1521,8 +1523,8 @@ export function createCrmService() {
         async () => {
           const engagement = await add(CRM_COLLECTIONS.engagements, buildEngagemnetPayload(payload, context))
           const normalized = { ...(engagement || {}), ...(engagement?.data || {}), id: engagement?.id || engagement?.docId || engagement?._id || null }
+
           await feedFinanceFromEngagement(normalized, 'create')
-          // await notifyWorkAssignment(normalized)
           return engagement
         },
         {

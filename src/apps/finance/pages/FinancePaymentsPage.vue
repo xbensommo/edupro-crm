@@ -143,7 +143,7 @@ const engagementOptions = computed(() => normalizeRows(st.engagements?.items || 
 
 const canLoadMoreClients = computed(() => {
   const bucket = st.clients || {}
-  console.trace(bucket)
+
   return Boolean(
     bucket.hasNextPage ||
     bucket.hasMore ||

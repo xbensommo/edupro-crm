@@ -1,6 +1,7 @@
 /** @file src/features/notifications/utils/notification.helpers.js */
 
 /**
+ * Converts any value into a trimmed string.
  * @param {unknown} value
  * @returns {string}
  */
@@ -9,6 +10,8 @@ export function asCleanText(value) {
 }
 
 /**
+ * Converts an optional text value to either trimmed text or null.
+ * Firestore allows null. Firestore does not allow undefined.
  * @param {unknown} value
  * @returns {string|null}
  */
@@ -18,11 +21,13 @@ export function nullableText(value) {
 }
 
 /**
+ * Normalizes array-like channel/role values.
  * @param {unknown} value
  * @returns {string[]}
  */
 export function cleanArray(value) {
-  return Array.isArray(value) ? value.filter(Boolean) : []
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.filter(Boolean).map((item) => String(item).trim()).filter(Boolean))]
 }
 
 /**
@@ -39,24 +44,57 @@ export function interpolateTemplate(template = '', variables = {}) {
 }
 
 /**
- * Deterministic enough for client-created queue dedupe keys.
- * The worker enforces server-side dedupe again.
+ * Sanitizes arbitrary text for deterministic Firestore document IDs and lock IDs.
+ * Firestore document IDs cannot contain slash and should stay reasonably short.
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function safeKeyPart(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9_.:-]/g, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 180)
+}
+
+/**
+ * Builds a stable dedupe key.
+ *
+ * Rule:
+ * Same event + same entity + same recipient + same channel + same occurrence = same delivery.
+ * For a repeated notification on the same entity, pass occurrenceId/revisionId/assignmentId.
+ *
  * @param {Record<string, any>} payload
  * @returns {string}
  */
 export function buildDedupeKey(payload = {}) {
   return [
-    payload.entityType || 'entity',
-    payload.entityId || payload.id || 'unknown',
     payload.event || 'event',
-    payload.recipientId || payload.user_id || payload.recipientEmail || 'recipient',
+    payload.entityType || 'entity',
+    payload.entityId || payload.engagementId || payload.id || payload.entityLabel || 'unknown',
+    payload.recipientId || payload.user_id || payload.uid || payload.recipientEmail || 'recipient',
     payload.channel || 'channel',
+    payload.occurrenceId || payload.assignmentId || payload.reviewId || payload.revisionId || 'default',
   ]
-    .map((part) => String(part || '').trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_.:-]/g, ''))
+    .map(safeKeyPart)
+    .filter(Boolean)
     .join(':')
+    .slice(0, 900)
 }
 
 /**
+ * Builds a deterministic document id from a dedupe key.
+ * @param {string} prefix
+ * @param {string} dedupeKey
+ * @returns {string}
+ */
+export function buildDedupeDocId(prefix, dedupeKey) {
+  return `${safeKeyPart(prefix)}_${safeKeyPart(dedupeKey)}`.slice(0, 900)
+}
+
+/**
+ * Normalizes rows returned either directly from shard-provider or as { id, data }.
  * @param {unknown} value
  * @returns {Record<string, any>|null}
  */

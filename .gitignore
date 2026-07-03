@@ -31,3 +31,5 @@ dist-ssr
 # Firebase
 firebase-debug.log
 .firebase
+
+public/firebase-messaging-sw-config.js

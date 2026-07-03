@@ -7,12 +7,13 @@ export default function createCrmRoutes() {
   const localLazy = (view) => () => import(`./pages/${view}.vue`)
 
   return [
-    {
+    /*{
       path: '/crm',
+      hideInNav: true,
       name: 'crm-dashboard',
       component: localLazy('CrmDashboardPage'),
       meta: { requiresAuth: true, roles: ['admin', 'receptionist', ], permissions: ['crm.dashboard.read'], title: 'CRM Dashboard' },
-    },
+    },*/
     {
       path: '/crm/add',
       name: 'crm-work-add',
@@ -37,11 +38,5 @@ export default function createCrmRoutes() {
       component: localLazy('ConsultantSubmitWorkPage'),
       meta: { requiresAuth: true, roles: ['admin', 'consultant'], permissions: ['crm.work.submit_final'], title: 'Submit Final Delivery', hideInNav: true },
     },
-    /*{
-      path: '/crm/activities',
-      name: 'crm-activities',
-      component: localLazy('CrmActivitiesPage'),
-      meta: { requiresAuth: true, roles: ['admin', 'receptionist'], permissions: ['crm.activities.read'], title: 'Activities' },
-    },*/
   ]
 }

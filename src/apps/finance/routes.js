@@ -172,6 +172,7 @@ export default [
       title: 'Finance Accounts',
       requiresAuth: true,
       feature: 'finance',
+      hideInNav: true,
       app: 'finance',
       permission: 'finance.account.read',
       roles: ['admin', 'receptionist'],
@@ -183,7 +184,7 @@ export default [
     component: FinanceReportsPage,
     meta: {
       title: 'Finance Reports',
-      requiresAuth: true,
+      requiresAuth: true, hideInNav: true,
       feature: 'finance',
       app: 'finance',
       permission: 'finance.report.read',
@@ -196,7 +197,7 @@ export default [
     component: FinanceBalanceSheetPage,
     meta: {
       title: 'Balance Sheet',
-      requiresAuth: true,
+      requiresAuth: true, hideInNav: true,
       feature: 'finance',
       app: 'finance',
       permission: 'finance.report.read',
@@ -210,6 +211,7 @@ export default [
     meta: {
       title: 'Income Statement',
       requiresAuth: true,
+      hideInNav: true,
       feature: 'finance',
       app: 'finance',
       permission: 'finance.report.read',
@@ -223,6 +225,7 @@ export default [
     meta: {
       title: 'Expense Statement',
       requiresAuth: true,
+      hideInNav: true,
       feature: 'finance',
       app: 'finance',
       permission: 'finance.report.read',

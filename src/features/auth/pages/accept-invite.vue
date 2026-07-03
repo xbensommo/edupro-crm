@@ -144,7 +144,7 @@ async function handleSubmit() {
     })
 
     toast.success('Account activated successfully.')
-    router.push(accessConfig.routes.defaultAuthenticated || '/crm')
+    router.push(accessConfig.routes.defaultAuthenticated || '/a')
   } catch (error) {
     toast.error('Unable to activate account.', {
       description: error?.message || 'Please review the form and try again.',

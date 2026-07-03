@@ -25,7 +25,7 @@
           <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div class="space-y-3">
               <div class="flex flex-wrap items-center gap-3">
-                <p class="text-xl font-semibold text-[var(--color-text,#0F172A)]">{{ transaction.reference || transaction.id }}</p>
+                <p class="text-xl font-semibold text-[var(--color-text,#0F172A)]">{{ transaction.reference }}</p>
                 <FinanceStatusBadge :status="transaction.status" />
               </div>
               <p class="text-sm text-[var(--color-text-light,#64748B)]">{{ transaction.memo || 'No memo recorded' }}</p>
@@ -33,9 +33,9 @@
                 <p>Type: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ transaction.type }}</span></p>
                 <p>Occurred: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ formatDate(transaction.occurredOn) }}</span></p>
                 <p>Amount: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ formatMoney(transaction.amount, transaction.currency || 'NAD') }}</span></p>
-                <p>Client: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ transaction.clientLabel || transaction.clientId || '—' }}</span></p>
-                <p>Consultant: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ transaction.consultantLabel || transaction.consultantId || '—' }}</span></p>
-                <p>Engagement: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ transaction.engagementCode || transaction.engagementId || '—' }}</span></p>
+                <p>Client: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ transaction.clientLabel || '—' }}</span></p>
+                <p>Consultant: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ transaction.consultantLabel || '—' }}</span></p>
+                <p>Engagement: <span class="font-medium text-[var(--color-text,#0F172A)]">{{ transaction.engagementCode ||  '—' }}</span></p>
               </div>
             </div>
 

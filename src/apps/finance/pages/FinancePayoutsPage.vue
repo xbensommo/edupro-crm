@@ -31,9 +31,18 @@
 
       <FinanceStatePanel v-if="showEmptyState" eyebrow="Payouts" title="No payout rows found" message="No payout rows match the current consultant filter and active range." />
       <div v-else class="grid gap-5">
+
         <article v-for="payout in filteredPayouts" :key="payout.id" class="rounded-[28px] border border-[var(--color-neutral-dark,#E2E8F0)] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.05)]">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><div class="flex flex-wrap items-center gap-3"><p class="text-xl font-semibold text-[var(--color-text,#0F172A)]">{{ payout.payoutCode }}</p><FinanceStatusBadge :status="payout.status || 'pending'" /></div><p class="mt-2 text-sm text-[var(--color-text-light,#64748B)]">{{ payout.consultantLabel || payout.consultantId }} · {{ payout.engagementCode || payout.engagementId }}</p><p class="mt-1 text-sm text-[var(--color-text-light,#64748B)]">{{ payout.clientLabel || payout.clientId }}</p></div>
+            <div>
+              <div class="flex flex-wrap items-center gap-3">
+                <p class="text-xl font-semibold text-[var(--color-text,#0F172A)]">{{ payout.payoutCode }}</p>
+                <FinanceStatusBadge :status="payout.status || 'pending'" />
+              </div>
+              <p class="mt-2 text-sm text-[var(--color-text-light,#64748B)]">{{ payout.consultantLabel || payout.consultantName }} · {{ payout.engagementCode }}</p>
+              <p class="mt-1 text-sm text-[var(--color-text-light,#64748B)]">{{ payout.clientLabel }}</p>
+            </div>
+
             <div class="grid gap-3 text-right text-sm text-[var(--color-text-light,#64748B)]"><p>Share: <span class="font-semibold text-[var(--color-text,#0F172A)]">{{ formatMoney(payout.consultantShareAmount) }}</span></p><p>Paid: <span class="font-semibold text-[var(--color-text,#0F172A)]">{{ formatMoney(payout.paidAmount || 0) }}</span></p><p>Balance: <span class="font-semibold text-[var(--color-text,#0F172A)]">{{ formatMoney(payout.balanceAmount || 0) }}</span></p><p>{{ formatDate(payout.payoutDate) }}</p><div class="pt-2"><button v-if="Number(payout.balanceAmount || 0) > 0" type="button" class="inline-flex items-center justify-center rounded-2xl bg-[var(--color-accent,#000000)] px-4 py-2 text-sm font-semibold text-white" @click="selectedPayout = payout">Mark paid</button></div></div>
           </div>
         </article>

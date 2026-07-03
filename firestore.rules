@@ -1,8 +1,1099 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ============================================================
+// Identity and role helpers — SAFE VERSION
+// ============================================================
+
+function signedIn() {
+  return request.auth != null;
+}
+
+function uid() {
+  return request.auth.uid;
+}
+
+function userPath(userId) {
+  return /databases/$(database)/documents/users/$(userId);
+}
+
+function currentUserPath() {
+  return userPath(uid());
+}
+
+function currentUserExists() {
+  return signedIn() && exists(currentUserPath());
+}
+
+function currentUser() {
+  return get(currentUserPath()).data;
+}
+
+// ------------------------------------------------------------
+// Safe map field checks
+// ------------------------------------------------------------
+
+function tokenHasField(field) {
+  return signedIn() && request.auth.token.keys().hasAny([field]);
+}
+
+function profileHasField(field) {
+  return currentUserExists() && currentUser().keys().hasAny([field]);
+}
+
+// ------------------------------------------------------------
+// Safe token roles
+// ------------------------------------------------------------
+
+function claimRoles() {
+  return tokenHasField('roles') && request.auth.token.roles is list
+    ? request.auth.token.roles
+    : tokenHasField('role') && request.auth.token.role is string
+      ? [request.auth.token.role]
+      : [];
+}
+
+// ------------------------------------------------------------
+// Safe Firestore profile roles
+// ------------------------------------------------------------
+
+function profileRoles() {
+  return profileHasField('roles') && currentUser().roles is list
+    ? currentUser().roles
+    : profileHasField('role') && currentUser().role is string
+      ? [currentUser().role]
+      : [];
+}
+
+// Prefer custom claims if present.
+// Fall back to /users/{uid}.role or /users/{uid}.roles.
+function currentRoles() {
+  return claimRoles().size() > 0
+    ? claimRoles()
+    : profileRoles();
+}
+
+function hasAnyRole(roles) {
+  return signedIn() && currentRoles().hasAny(roles);
+}
+
+function hasRole(role) {
+  return hasAnyRole([role]);
+}
+
+function isEnabledAccount() {
+  return signedIn()
+    && (
+      !currentUserExists()
+      || !(
+        profileHasField('status')
+        && currentUser().status in [
+          'suspended',
+          'disabled',
+          'inactive',
+          'revoked'
+        ]
+      )
+    );
+}
+
+function isSysAdmin() {
+  return isEnabledAccount()
+    && hasAnyRole(['sys_admin', 'sysadmin']);
+}
+
+function isAdmin() {
+  return isEnabledAccount()
+    && hasRole('admin');
+}
+
+function isReceptionist() {
+  return isEnabledAccount()
+    && hasRole('receptionist');
+}
+
+function isConsultant() {
+  return isEnabledAccount()
+    && hasRole('consultant');
+}
+
+function isConsultantEditor() {
+  return isEnabledAccount()
+    && hasAnyRole(['consultant_editor', 'editor']);
+}
+
+function isFinance() {
+  return isEnabledAccount()
+    && hasRole('finance');
+}
+
+function isOperations() {
+  return isEnabledAccount()
+    && hasAnyRole([
+      'admin',
+      'receptionist',
+      'sys_admin',
+      'sysadmin'
+    ]);
+}
+
+function isAdminCore() {
+  return isEnabledAccount()
+    && hasAnyRole([
+      'admin',
+      'sys_admin',
+      'sysadmin'
+    ]);
+}
+
+function isFinanceOps() {
+  return isOperations() || isFinance();
+}
+
+function isStaff() {
+  return isEnabledAccount()
+    && hasAnyRole([
+      'admin',
+      'receptionist',
+      'consultant',
+      'consultant_editor',
+      'editor',
+      'finance',
+      'sys_admin',
+      'sysadmin'
+    ]);
+}
+
+    function isSelf(userId) {
+      return signedIn() && uid() == userId;
+    }
+
+    function authEmail() {
+      return signedIn() && request.auth.token.email is string
+        ? request.auth.token.email
+        : '';
+    }
+
+    function emailMatchesAuth(email) {
+      return signedIn()
+        && email is string
+        && authEmail() != ''
+        && email == authEmail();
+    }
+
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    function createdKeysOnly(keys) {
+      return request.resource.data.keys().hasOnly(keys);
+    }
+
+    function isAssignedConsultant(doc) {
+  return signedIn()
+    && doc.keys().hasAny(['assignedConsultantId'])
+    && doc.assignedConsultantId is string
+    && doc.assignedConsultantId == uid();
+}
+
+function isAssignedEditor(doc) {
+  return signedIn()
+    && (
+      (
+        doc.keys().hasAny(['assignedEditorId'])
+        && doc.assignedEditorId is string
+        && doc.assignedEditorId == uid()
+      )
+      || (
+        doc.keys().hasAny(['editorId'])
+        && doc.editorId is string
+        && doc.editorId == uid()
+      )
+    );
+}
+
+    function isCreatedByMe(doc) {
+      return signedIn()
+        && (
+          (doc.createdBy is string && doc.createdBy == uid())
+          || (doc.createdByUserId is string && doc.createdByUserId == uid())
+          || (doc.user_id is string && doc.user_id == uid())
+          || (doc.owner is string && doc.owner == uid())
+          || (doc.uploadedBy is string && doc.uploadedBy == uid())
+        );
+    }
+
+    function hasOwnerAccess(doc) {
+      return signedIn()
+        && (
+          (doc.keys().hasAny(['createdBy']) && doc.createdBy is string && doc.createdBy == uid())
+          || (doc.keys().hasAny(['createdByUserId']) && doc.createdByUserId is string && doc.createdByUserId == uid())
+          || (doc.keys().hasAny(['user_id']) && doc.user_id is string && doc.user_id == uid())
+          || (doc.keys().hasAny(['owner']) && doc.owner is string && doc.owner == uid())
+          || (doc.keys().hasAny(['uploadedBy']) && doc.uploadedBy is string && doc.uploadedBy == uid())
+          || (doc.keys().hasAny(['assignedTo']) && doc.assignedTo is string && doc.assignedTo == uid())
+          || (doc.keys().hasAny(['assignedConsultantId']) && doc.assignedConsultantId is string && doc.assignedConsultantId == uid())
+          || (doc.keys().hasAny(['assignedEditorId']) && doc.assignedEditorId is string && doc.assignedEditorId == uid())
+          || (doc.keys().hasAny(['consultantId']) && doc.consultantId is string && doc.consultantId == uid())
+          || (doc.keys().hasAny(['relatedUserId']) && doc.relatedUserId is string && doc.relatedUserId == uid())
+        );
+    }
+
+    // ============================================================
+    // 2. Auth / users
+    // ============================================================
+
+    match /roles/{docId} {
+      allow read: if isStaff();
+      allow create, update, delete: if isSysAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isOperations() || isConsultantEditor();
+
+      allow list: if isOperations();
+
+      // This prevents useless login errors.
+      // A signed-in user may create their own basic profile after Firebase Auth login.
+      // They cannot create themselves as admin/sys_admin.
+      allow create: if isSelf(userId)
+        && emailMatchesAuth(request.resource.data.email)
+        && request.resource.data.uid == uid()
+        && request.resource.data.user_id == uid()
+        && (
+          !('role' in request.resource.data)
+          || request.resource.data.role in [
+            'pending',
+            'user',
+            'consultant',
+            'consultant_editor',
+            'editor',
+            'receptionist'
+          ]
+        )
+        && !(
+          request.resource.data.role in [
+            'admin',
+            'sys_admin',
+            'sysadmin',
+            'finance'
+          ]
+        );
+
+      // Operations may create staff profiles.
+      allow create: if isOperations();
+
+      // Users can update harmless profile fields only.
+      allow update: if isSelf(userId)
+        && changedOnly([
+          'displayName',
+          'firstName',
+          'lastName',
+          'phone',
+          'phoneNumber',
+          'photoURL',
+          'emailVerified',
+          'lastLoginAt',
+          'lastSeenAt',
+          'updatedAt'
+        ]);
+
+      // Admin/receptionist can manage normal user profiles.
+      allow update: if isOperations();
+
+      // Only sys_admin deletes user profiles.
+      allow delete: if isSysAdmin();
+    }
+
+    match /user_invites/{inviteId} {
+      // Needed so an invited user can validate a specific invite link.
+      allow get: if true;
+
+      allow list: if isOperations();
+
+      allow create, delete: if isOperations();
+
+      // Invitee may only mark their invite accepted after signing in
+      // with the same email.
+      allow update: if isOperations()
+        || (
+          signedIn()
+          && emailMatchesAuth(resource.data.email)
+          && changedOnly([
+            'status',
+            'acceptedAt',
+            'acceptedByUid',
+            'updatedAt'
+          ])
+        );
+    }
+
+    match /password-reset-tokens/{docId} {
+      allow read, write: if false;
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isOperations()
+        || (
+          signedIn()
+          && resource.data.user_id == uid()
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.user_id == uid();
+
+      allow update: if isOperations()
+        || (
+          signedIn()
+          && resource.data.user_id == uid()
+          && changedOnly([
+            'userAgent',
+            'provider',
+            'isActive',
+            'lastActivityAt',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if isOperations()
+        || (
+          signedIn()
+          && resource.data.user_id == uid()
+        );
+    }
+
+    // ============================================================
+    // 3. Client records
+    // ============================================================
+
+    match /clients/{clientId} {
+      allow read: if isOperations() || isConsultantEditor();
+      allow create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /clientContacts/{docId} {
+      allow read: if isOperations() || isConsultantEditor();
+      allow create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /clientActivities/{docId} {
+      allow read: if isOperations()
+        || isConsultantEditor()
+        || hasOwnerAccess(resource.data);
+
+      allow create: if isOperations() || isConsultantEditor();
+
+      allow update: if isOperations() || isConsultantEditor();
+
+      allow delete: if isAdminCore();
+    }
+
+    match /clientNotes/{docId} {
+      allow read: if isOperations()
+        || isConsultantEditor()
+        || hasOwnerAccess(resource.data);
+
+      allow create: if isOperations() || isConsultantEditor();
+
+      allow update: if isOperations() || isConsultantEditor();
+
+      allow delete: if isAdminCore();
+    }
+
+    // ============================================================
+    // 4. CRM pipeline
+    // ============================================================
+
+    match /crm_leads/{docId} {
+      // Public website lead capture.
+      allow create: if true;
+
+      allow read, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_accounts/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_contacts/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_opportunities/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_assignment_rules/{docId} {
+      allow read: if isOperations();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /crm_automation_rules/{docId} {
+      allow read: if isOperations();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /crm_tasks/{docId} {
+      allow read: if isOperations()
+        || hasOwnerAccess(resource.data);
+
+      allow create: if isOperations();
+
+      allow update: if isOperations()
+        || (
+          signedIn()
+          && (
+            resource.data.assignedTo == uid()
+            || resource.data.createdBy == uid()
+          )
+          && changedOnly([
+            'status',
+            'priority',
+            'dueAt',
+            'reminderAt',
+            'completedAt',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_saved_views/{docId} {
+      allow read: if isOperations()
+        || resource.data.visibility in ['public', 'team']
+        || (
+          signedIn()
+          && resource.data.owner == uid()
+        );
+
+      allow create: if isOperations()
+        || (
+          signedIn()
+          && request.resource.data.owner == uid()
+        );
+
+      allow update, delete: if isOperations()
+        || (
+          signedIn()
+          && resource.data.owner == uid()
+        );
+    }
+
+    match /crm_notes/{docId} {
+      allow read: if isOperations()
+        || hasOwnerAccess(resource.data);
+
+      allow create: if isOperations()
+        || (
+          signedIn()
+          && request.resource.data.createdBy == uid()
+        );
+
+      allow update: if isOperations()
+        || (
+          signedIn()
+          && resource.data.createdBy == uid()
+          && changedOnly([
+            'title',
+            'body',
+            'visibility',
+            'pinned',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_messages/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_documents/{docId} {
+      allow read, create, update: if isOperations();
+      allow delete: if isAdminCore();
+    }
+
+    match /crm_attachments/{docId} {
+      allow read: if isOperations()
+        || hasOwnerAccess(resource.data);
+
+      allow create: if isOperations()
+        || (
+          signedIn()
+          && request.resource.data.uploadedBy == uid()
+        );
+
+      allow update: if isOperations();
+
+      allow delete: if isAdminCore()
+        || (
+          signedIn()
+          && resource.data.uploadedBy == uid()
+        );
+    }
+
+    match /crm_files/{docId} {
+      allow read: if isOperations()
+        || isConsultantEditor()
+        || hasOwnerAccess(resource.data);
+
+      allow create: if isOperations()
+        || isConsultantEditor()
+        || (
+          signedIn()
+          && request.resource.data.uploadedBy == uid()
+        );
+
+      allow update: if isOperations() || isConsultantEditor();
+
+      allow delete: if isAdminCore()
+        || (
+          signedIn()
+          && resource.data.uploadedBy == uid()
+        );
+    }
+
+    match /crm_activities/{docId} {
+      allow read: if isOperations()
+        || hasOwnerAccess(resource.data);
+
+      allow create, update: if isOperations();
+
+      allow delete: if isAdminCore();
+    }
+
+    // ============================================================
+    // 5. Engagement workflow
+    // ============================================================
+
+    function consultantCanUpdateEngagement() {
+      return isAssignedConsultant(resource.data)
+        && changedOnly([
+          'assignmentStatus',
+          'assignmentRespondedAt',
+          'assignmentRespondedBy',
+          'assignmentRespondedByName',
+          'assignmentDenialReason',
+          'status',
+          'deliveryStatus',
+          'submittedAt',
+          'deliveredAt',
+          'completedAt',
+          'remarks',
+          'finalUpdates',
+          'finalFiles',
+          'finalFileUrls',
+          'finalAttachmentsCount',
+          'finalRemarks',
+          'finalSubmittedAt',
+          'finalSubmittedBy',
+          'finalSubmittedByName',
+          'hasAttachments',
+          'attachmentsCount',
+          'files',
+          'fileUrls',
+          'updatedAt'
+        ]);
+    }
+
+    function editorCanUpdateEngagement() {
+      return isAssignedEditor(resource.data)
+        && changedOnly([
+          'reviewStatus',
+          'reviewDecision',
+          'reviewRespondedAt',
+          'reviewRespondedBy',
+          'reviewRespondedByName',
+          'reviewRemarks',
+          'reviewDeductionPercent',
+          'status',
+          'deliveryStatus',
+          'updatedAt'
+        ]);
+    }
+
+    match /engagements/{engagementId} {
+      allow read: if isOperations()
+        || isAssignedConsultant(resource.data)
+        || isAssignedEditor(resource.data);
+
+      allow create: if isOperations();
+
+      allow update: if isOperations()
+        || consultantCanUpdateEngagement()
+        || editorCanUpdateEngagement();
+
+      allow delete: if isAdminCore();
+    }
+
+    // ============================================================
+    // 6. Finance
+    // ============================================================
+
+    match /finance_accounts/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /finance_audit_logs/{logId} {
+      allow read: if isFinanceOps();
+      allow create: if isFinanceOps();
+      allow update: if false;
+      allow delete: if isSysAdmin();
+    }
+
+    match /finance_periods/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /share_rules/{docId} {
+      allow read: if isFinanceOps();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /payments/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /payment_allocations/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /refunds/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /expenses/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /finance_transactions/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /finance_journal_entries/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /journal_entries/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /journal_lines/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /consultant_payouts/{docId} {
+      allow read: if isFinanceOps()
+        || (
+          signedIn()
+          && resource.data.consultantId == uid()
+        );
+
+      allow create, update: if isFinanceOps();
+
+      allow delete: if isAdminCore();
+    }
+
+    match /quotations/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /invoices/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /invoice_items/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    match /receipts/{docId} {
+      allow read, create, update: if isFinanceOps();
+      allow delete: if isAdminCore();
+    }
+
+    // ============================================================
+    // 7. Notifications
+    // ============================================================
+
+    function canReadNotification(doc) {
+      return isOperations()
+        || (
+          signedIn()
+          && doc.keys().hasAny(['user_id'])
+          && doc.user_id is string
+          && doc.user_id == uid()
+        )
+        || (
+          signedIn()
+          && doc.keys().hasAny(['roleScope'])
+          && doc.roleScope is list
+          && doc.roleScope.hasAny(currentRoles())
+        );
+    }
+
+    function canCreateNotification() {
+      return isStaff()
+        && request.resource.data.event is string
+        && request.resource.data.title is string
+        && request.resource.data.message is string
+        && request.resource.data.dedupeKey is string
+        && (
+          request.resource.data.user_id is string
+          || request.resource.data.roleScope is list
+        );
+    }
+
+    function canUpdateOwnNotification() {
+      return signedIn()
+        && resource.data.user_id == uid()
+        && changedOnly([
+          'status',
+          'readAt',
+          'archivedAt',
+          'updatedAt'
+        ]);
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if canReadNotification(resource.data);
+
+      // Compatibility rule:
+      // your current app creates notifications client-side through the CRM bridge.
+      // Later, move this to Cloud Functions and set allow create: if false.
+      allow create: if canCreateNotification();
+
+      allow update: if isOperations()
+        || canUpdateOwnNotification();
+
+      allow delete: if isAdminCore();
+    }
+      match /notification_preferences/{prefId} {
+  allow get: if isOperations()
+    || (
+      signedIn()
+      && resource.data.keys().hasAny(['user_id'])
+      && resource.data.user_id == uid()
+    );
+
+  allow list: if isOperations()
+    || (
+      signedIn()
+      && request.query != null
+    );
+
+  allow create: if signedIn()
+    && request.resource.data.keys().hasAny(['user_id'])
+    && request.resource.data.user_id == uid();
+
+  allow update: if isOperations()
+    || (
+      signedIn()
+      && resource.data.keys().hasAny(['user_id'])
+      && resource.data.user_id == uid()
+      && request.resource.data.user_id == resource.data.user_id
+      && changedOnly([
+        'enabled',
+        'channels',
+        'quietHours',
+        'categorySettings',
+        'updatedAt',
+        'lastUpdatedAt'
+      ])
+    );
+
+  allow delete: if isAdminCore()
+    || (
+      signedIn()
+      && resource.data.keys().hasAny(['user_id'])
+      && resource.data.user_id == uid()
+    );
+}
+
+    match /notification_templates/{templateId} {
+      allow read: if isStaff();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /notification_delivery_queue/{queueId} {
+      allow read: if isOperations();
+
+      // Compatibility rule for client-side notification bridge.
+      // The Cloud Function uses Admin SDK and bypasses rules.
+      allow create: if isStaff()
+        && request.resource.data.status == 'pending'
+        && request.resource.data.channel in ['email', 'push']
+        && request.resource.data.event is string
+        && request.resource.data.dedupeKey is string
+        && (
+          request.resource.data.user_id is string
+          || request.resource.data.recipientEmail is string
+          || request.resource.data.recipientId is string
+        );
+
+      // Browser clients must not process the queue.
+      allow update, delete: if false;
+    }
+
+    match /notification_logs/{logId} {
+      allow read: if isOperations();
+
+      // Prefer Cloud Functions only.
+      // Kept false because Admin SDK bypasses rules.
+      allow create, update, delete: if false;
+    }
+
+    match /notification_push_tokens/{tokenId} {
+      allow read: if isOperations()
+        || (
+          signedIn()
+          && resource.data.user_id == uid()
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.user_id == uid()
+        && request.resource.data.provider == 'fcm'
+        && request.resource.data.platform == 'web'
+        && request.resource.data.token is string
+        && request.resource.data.status in ['active', 'revoked', 'invalid'];
+
+      allow update: if signedIn()
+        && resource.data.user_id == uid()
+        && request.resource.data.user_id == resource.data.user_id
+        && changedOnly([
+          'status',
+          'lastSeenAt',
+          'revokedAt',
+          'updatedAt',
+          'userAgent'
+        ]);
+
+      allow delete: if isAdminCore()
+        || (
+          signedIn()
+          && resource.data.user_id == uid()
+        );
+    }
+
+    match /_notification_delivery_locks/{lockId} {
+      allow read, write: if false;
+    }
+
+    // ============================================================
+    // 8. Dashboard / reports / KPI
+    // ============================================================
+
+    match /dashboard_configs/{docId} {
+      allow read: if isStaff()
+        && (
+          isOperations()
+          || !(resource.data.roleScope is list)
+          || resource.data.roleScope.hasAny(currentRoles())
+        );
+
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /kpi_snapshots/{docId} {
+      allow read: if isOperations();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /reports/{docId} {
+      allow read: if isOperations();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /activity_logs/{docId} {
+      allow read: if isOperations();
+
+      // Frontend may create activity logs for now.
+      // Better final system: Cloud Functions only.
+      allow create: if isStaff();
+
+      allow update: if false;
+
+      allow delete: if isAdminCore();
+    }
+
+    match /mediaFiles/{docId} {
+      allow read: if isStaff();
+
+      allow create: if isOperations()
+        || (
+          signedIn()
+          && request.resource.data.uploadedBy == uid()
+        );
+
+      allow update: if isOperations();
+
+      allow delete: if isAdminCore()
+        || (
+          signedIn()
+          && resource.data.uploadedBy == uid()
+        );
+    }
+
+    // ============================================================
+    // 9. Optional booking collections
+    // ============================================================
+
+    match /bookings/{docId} {
+      allow read: if isOperations()
+        || hasOwnerAccess(resource.data);
+
+      allow create: if isOperations();
+
+      allow update: if isOperations()
+        || (
+          signedIn()
+          && (
+            resource.data.assignedTo == uid()
+            || resource.data.consultantId == uid()
+          )
+          && changedOnly([
+            'status',
+            'notes',
+            'updatedAt'
+          ])
+        );
+
+      allow delete: if isAdminCore();
+    }
+
+    match /booking_services/{docId} {
+      allow read: if isStaff();
+      allow create, update, delete: if isAdminCore();
+    }
+
+    match /booking_reminders/{docId} {
+      allow read: if isOperations()
+        || hasOwnerAccess(resource.data);
+
+      allow create, update, delete: if isOperations();
+    }
+
+    match /availability_profiles/{docId} {
+      allow read: if isStaff();
+
+      allow create: if isOperations()
+        || (
+          signedIn()
+          && request.resource.data.user_id == uid()
+        );
+
+      allow update: if isOperations()
+        || (
+          signedIn()
+          && resource.data.user_id == uid()
+        );
+
+      allow delete: if isAdminCore();
+    }
+
+    // ============================================================
+    // 10. Known sharded collection fallback
+    // ============================================================
+    // Keep this only if shard-provider still creates top-level collections
+    // like engagements-2026-04 or notifications-2026-04.
+    // If your current shard mode is "none", you can remove this block.
+
+    match /{collection}/{docId} {
+      allow read: if collection.matches('^engagements-.*')
+        && (
+          isOperations()
+          || isAssignedConsultant(resource.data)
+          || isAssignedEditor(resource.data)
+        );
+
+      allow create: if collection.matches('^engagements-.*')
+        && isOperations();
+
+      allow update: if collection.matches('^engagements-.*')
+        && (
+          isOperations()
+          || consultantCanUpdateEngagement()
+          || editorCanUpdateEngagement()
+        );
+
+      allow delete: if collection.matches('^engagements-.*')
+        && isAdminCore();
+
+      allow read: if collection.matches('^notifications-.*')
+        && canReadNotification(resource.data);
+
+      allow create: if collection.matches('^notifications-.*')
+        && canCreateNotification();
+
+      allow update: if collection.matches('^notifications-.*')
+        && (
+          isOperations()
+          || canUpdateOwnNotification()
+        );
+
+      allow delete: if collection.matches('^notifications-.*')
+        && isAdminCore();
+
+      allow read: if collection.matches('^notification_push_tokens-.*')
+        && (
+          isOperations()
+          || (
+            signedIn()
+            && resource.data.user_id == uid()
+          )
+        );
+
+      allow create: if collection.matches('^notification_push_tokens-.*')
+        && signedIn()
+        && request.resource.data.user_id == uid()
+        && request.resource.data.provider == 'fcm'
+        && request.resource.data.platform == 'web'
+        && request.resource.data.token is string;
+
+      allow update: if collection.matches('^notification_push_tokens-.*')
+        && signedIn()
+        && resource.data.user_id == uid()
+        && request.resource.data.user_id == resource.data.user_id;
+
+      allow delete: if collection.matches('^notification_push_tokens-.*')
+        && (
+          isAdminCore()
+          || (
+            signedIn()
+            && resource.data.user_id == uid()
+          )
+        );
+    }
+
+    // ============================================================
+    // 11. Default deny
+    // ============================================================
+
     match /{document=**} {
-      allow read, write, create, delete, update: if true; // UNSAFE for production!
+      allow read, write: if false;
     }
   }
 }

@@ -12,6 +12,7 @@ export default [
       roles: ['admin', 'receptionist', 'consultant', 'consultant_editor', 'sysadmin'],
       feature: 'media',
       permissions: ['media.view'],
+      hideInNav: true,
       title: 'System files',
     },
   },
@@ -21,6 +22,7 @@ export default [
     component: () => import('./pages/MediaUploadPage.vue'),
     meta: {
       requiresAuth: true,
+      hideInNav: true,
       roles: ['admin', 'receptionist', 'consultant', 'consultant_editor', 'sysadmin'],
       feature: 'media',
       permissions: ['media.manage'],

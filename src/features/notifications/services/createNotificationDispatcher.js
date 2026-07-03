@@ -9,6 +9,9 @@ import { buildDedupeKey } from '../utils/notification.helpers.js'
  * Persists one in-app notification row and queues external delivery rows.
  * External providers are never called from the browser.
  *
+ * Duplicate protection is enforced by repository.saveNotification() and
+ * repository.queueDelivery() using deterministic dedupe keys.
+ *
  * @param {{ repository: any, recipientField?: string, now?: () => Date }} options
  */
 export function createNotificationDispatcher(options = {}) {
@@ -22,19 +25,44 @@ export function createNotificationDispatcher(options = {}) {
     }
 
     const channels = Array.isArray(payload.channels) && payload.channels.length
-      ? payload.channels.filter(Boolean)
+      ? [...new Set(payload.channels.filter(Boolean))]
       : [NOTIFICATION_CHANNELS.IN_APP]
+
+    const recipientId = payload.recipientId || payload[recipientField] || payload.user_id || null
+    const baseDedupeKey = payload.dedupeKey || buildDedupeKey({
+      ...payload,
+      recipientId,
+      channel: 'record',
+    })
 
     const notificationRecord = await repository.saveNotification({
       ...payload,
+      dedupeKey: baseDedupeKey,
       channel: NOTIFICATION_CHANNELS.IN_APP,
       channels,
-      status: channels.includes(NOTIFICATION_CHANNELS.IN_APP) ? NOTIFICATION_STATUSES.SENT : NOTIFICATION_STATUSES.QUEUED,
+      status: channels.includes(NOTIFICATION_CHANNELS.IN_APP)
+        ? NOTIFICATION_STATUSES.SENT
+        : NOTIFICATION_STATUSES.QUEUED,
       sentAt: channels.includes(NOTIFICATION_CHANNELS.IN_APP) ? now().toISOString() : null,
     })
 
     const notificationId = notificationRecord?.id || notificationRecord?.docId || notificationRecord?._id || null
-    const recipientId = payload.recipientId || payload[recipientField] || payload.user_id || null
+
+    /**
+     * If the notification row already existed, stop here.
+     * This prevents duplicate log rows and duplicate email/push queue rows after
+     * double-clicks, repeated service calls, or repeated CRM hooks.
+     */
+    if (notificationRecord?._deduped) {
+      return [{
+        ok: true,
+        skipped: true,
+        reason: 'DUPLICATE_NOTIFICATION',
+        channel: 'all',
+        notificationId,
+      }]
+    }
+
     const deliveries = []
 
     if (channels.includes(NOTIFICATION_CHANNELS.IN_APP)) {
@@ -117,12 +145,20 @@ export function createNotificationDispatcher(options = {}) {
         event: payload.event,
         channel,
         provider: 'delivery_queue',
-        status: NOTIFICATION_STATUSES.QUEUED,
+        status: queued?._deduped ? NOTIFICATION_STATUSES.SKIPPED : NOTIFICATION_STATUSES.QUEUED,
         domain: payload.domain,
         payload,
-        response: { ok: true, queueId },
+        response: { ok: true, queueId, deduped: Boolean(queued?._deduped) },
       })
-      deliveries.push({ ok: true, provider: 'delivery_queue', channel, queueId, notificationId })
+      deliveries.push({
+        ok: true,
+        provider: 'delivery_queue',
+        channel,
+        queueId,
+        notificationId,
+        skipped: Boolean(queued?._deduped),
+        reason: queued?._deduped ? 'DUPLICATE_QUEUE_ITEM' : null,
+      })
     }
 
     return deliveries

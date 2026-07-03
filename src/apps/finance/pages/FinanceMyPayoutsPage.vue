@@ -13,15 +13,18 @@
       </div>
 
       <FinanceStatePanel v-if="showEmptyState" eyebrow="My payouts" title="No payout records found" message="No payout rows were found for your account in the active range." />
+      
       <div v-else class="grid gap-5">
+      
         <article v-for="payout in rows" :key="payout.id" class="rounded-[28px] border border-[var(--color-neutral-dark,#E2E8F0)] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.05)]">
+
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div class="flex flex-wrap items-center gap-3">
-                <p class="text-xl font-semibold text-[var(--color-text,#0F172A)]">{{ payout.payoutCode }}</p>
+                <p class="text-xl font-semibold text-[var(--color-text,#0F172A)]">Ref: {{ payout.payoutCode }}</p>
                 <FinanceStatusBadge :status="payout.status || 'pending'" />
               </div>
-              <p class="mt-2 text-sm text-[var(--color-text-light,#64748B)]">{{ payout.engagementCode || payout.engagementId }} · {{ payout.clientLabel || payout.clientId }}</p>
+              <p class="mt-2 text-sm text-[var(--color-text-light,#64748B)]">{{  payout.engagementCode }} · {{payout.consultantName || payout.clientLabel || payout.consultantInfo || root.currentUser.firstName }}</p>
             </div>
             <div class="grid gap-2 text-right text-sm text-[var(--color-text-light,#64748B)]">
               <p>Share: <span class="font-semibold text-[var(--color-text,#0F172A)]">{{ formatMoney(payout.consultantShareAmount) }}</span></p>
@@ -31,6 +34,7 @@
             </div>
           </div>
         </article>
+
       </div>
     </template>
   </section>
@@ -44,7 +48,8 @@ import FinanceStatePanel from '../components/FinanceStatePanel.vue'
 import FinanceStatusBadge from '../components/FinanceStatusBadge.vue'
 import { formatDate, formatMoney } from '../services/financeFormatters.js'
 import { useFinanceAppStore } from '../stores/useFinanceAppStore.js'
-
+import { useAppStore } from '@app/stores/appStore';
+const root = useAppStore();
 const store = useFinanceAppStore()
 store.ensureReady('my-payouts')
 

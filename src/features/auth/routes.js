@@ -26,10 +26,10 @@ export default [
     name: 'auth.team-access',
     component: () => import('./pages/team-access.vue'),
     meta: {
-      requiresAuth: false,
+      requiresAuth: true,
       guestOnly: false,
       title: 'User management',
-     // roles: ['admin', 'receptionist', 'sysadmin'],
+     roles: ['admin', 'receptionist', 'sysadmin'],
       permissions: ['auth.users.read', 'auth.users.manage', 'auth.invites.read'],
     },
   },

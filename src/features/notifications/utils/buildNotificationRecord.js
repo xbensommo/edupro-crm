@@ -4,11 +4,8 @@ import { buildDedupeKey, cleanArray, nullableText } from './notification.helpers
 
 function firstDefined(...values) {
   for (const value of values) {
-    if (value !== undefined && value !== null && value !== '') {
-      return value
-    }
+    if (value !== undefined && value !== null && value !== '') return value
   }
-
   return values.some((value) => value === null) ? null : undefined
 }
 
@@ -21,7 +18,13 @@ function isPlainObject(value) {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
 
-function stripUndefined(value) {
+/**
+ * Firestore rejects undefined anywhere in an object tree.
+ * This is the last line of defence before shard-provider writes.
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+export function stripUndefined(value) {
   if (Array.isArray(value)) {
     return value
       .filter((item) => item !== undefined)
@@ -48,8 +51,10 @@ export function buildNotificationRecord(payload = {}, options = {}) {
   const recipientField = options.recipientField || 'user_id'
   const createdAt = payload.createdAt || timestamp(options.now)
   const recipientId = firstDefined(payload.recipientId, payload[recipientField], payload.user_id, payload.uid)
+  const channel = String(payload.channel || 'in_app').trim()
+  const dedupeKey = payload.dedupeKey || buildDedupeKey({ ...payload, recipientId, channel })
 
-  return {
+  return stripUndefined({
     [recipientField]: recipientId,
     title: String(payload.title || '').trim(),
     message: String(payload.message || '').trim(),
@@ -57,7 +62,7 @@ export function buildNotificationRecord(payload = {}, options = {}) {
     type: String(payload.type || payload.domain || 'system').trim(),
     domain: String(payload.domain || payload.type || 'system').trim(),
     sourceModule: String(payload.sourceModule || payload.domain || payload.type || 'system').trim(),
-    channel: payload.channel || 'in_app',
+    channel,
     channels: cleanArray(payload.channels).length ? cleanArray(payload.channels) : ['in_app'],
     status: String(payload.status || 'queued').trim(),
     priority: String(payload.priority || 'normal').trim(),
@@ -69,15 +74,15 @@ export function buildNotificationRecord(payload = {}, options = {}) {
     entityLabel: firstDefined(payload.entityLabel, null),
     actorId: firstDefined(payload.actorId, null),
     actorName: String(payload.actorName || 'System').trim(),
-    roleScope: firstDefined(payload.roleScope, null),
-    dedupeKey: payload.dedupeKey || null,
+    roleScope: cleanArray(payload.roleScope),
+    dedupeKey,
     meta: payload.meta && typeof payload.meta === 'object' ? payload.meta : null,
     readAt: firstDefined(payload.readAt, null),
     archivedAt: firstDefined(payload.archivedAt, null),
     sentAt: firstDefined(payload.sentAt, null),
     createdAt,
     updatedAt: payload.updatedAt || createdAt,
-  }
+  })
 }
 
 /**
@@ -89,15 +94,17 @@ export function buildNotificationLog(payload = {}, options = {}) {
   const recipientField = options.recipientField || 'user_id'
   const createdAt = payload.createdAt || timestamp(options.now)
   const recipientId = firstDefined(payload.recipientId, payload[recipientField], payload.user_id, payload.uid)
+  const channel = String(payload.channel || 'in_app').trim()
+  const dedupeKey = firstDefined(payload.dedupeKey, buildDedupeKey({ ...payload, recipientId, channel }), null)
 
-  return {
+  return stripUndefined({
     notificationId: firstDefined(payload.notificationId, null),
     queueId: firstDefined(payload.queueId, null),
-    dedupeKey: firstDefined(payload.dedupeKey, null),
+    dedupeKey,
     [recipientField]: recipientId,
     recipientEmail: nullableText(payload.recipientEmail),
     event: String(payload.event || 'system.alert').trim(),
-    channel: String(payload.channel || 'in_app').trim(),
+    channel,
     provider: String(payload.provider || payload.channel || 'database').trim(),
     status: String(payload.status || 'queued').trim(),
     domain: String(payload.domain || 'system').trim(),
@@ -106,7 +113,7 @@ export function buildNotificationLog(payload = {}, options = {}) {
     response: payload.response || null,
     sentAt: firstDefined(payload.sentAt, null),
     createdAt,
-  }
+  })
 }
 
 /**
@@ -121,7 +128,7 @@ export function buildNotificationDeliveryQueueItem(payload = {}, options = {}) {
   const channel = String(payload.channel || 'email').trim()
   const dedupeKey = payload.dedupeKey || buildDedupeKey({ ...payload, recipientId, channel })
 
-  return {
+  return stripUndefined({
     dedupeKey,
     notificationId: firstDefined(payload.notificationId, null),
     [recipientField]: recipientId,
@@ -144,14 +151,14 @@ export function buildNotificationDeliveryQueueItem(payload = {}, options = {}) {
     actionLabel: nullableText(payload.actionLabel),
     attempts: Number(payload.attempts || 0),
     maxAttempts: Number(payload.maxAttempts || 3),
-    lockedAt: null,
-    lockedBy: null,
-    lastError: null,
+    lockedAt: firstDefined(payload.lockedAt, null),
+    lockedBy: firstDefined(payload.lockedBy, null),
+    lastError: firstDefined(payload.lastError, null),
     processAfter: payload.processAfter || createdAt,
-    sentAt: null,
+    sentAt: firstDefined(payload.sentAt, null),
     createdAt,
-    updatedAt: createdAt,
-  }
+    updatedAt: payload.updatedAt || createdAt,
+  })
 }
 
 /**
@@ -163,7 +170,7 @@ export function buildNotificationDeliveryQueueItem(payload = {}, options = {}) {
 export function buildNotificationPreferences(recipientId, payload = {}, options = {}) {
   const recipientField = options.recipientField || 'user_id'
   const now = timestamp(options.now)
-  return {
+  return stripUndefined({
     [recipientField]: recipientId,
     enabled: payload.enabled !== false,
     channels: cleanArray(payload.channels).length ? cleanArray(payload.channels) : ['in_app'],
@@ -172,7 +179,34 @@ export function buildNotificationPreferences(recipientId, payload = {}, options 
     role: payload.role || null,
     createdAt: payload.createdAt || now,
     updatedAt: payload.updatedAt || now,
-  }
+  })
+}
+
+/**
+ * @param {string} recipientId
+ * @param {Record<string, any>} payload
+ * @param {{ recipientField?: string, now?: () => Date }} options
+ * @returns {Record<string, any>}
+ */
+export function buildNotificationPushToken(recipientId, payload = {}, options = {}) {
+  const recipientField = options.recipientField || 'user_id'
+  const now = timestamp(options.now)
+  return stripUndefined({
+    [recipientField]: recipientId,
+    token: String(payload.token || '').trim(),
+    tokenHash: String(payload.tokenHash || '').trim(),
+    provider: 'fcm',
+    platform: payload.platform || 'web',
+    permission: payload.permission || 'granted',
+    status: payload.status || 'active',
+    browserName: payload.browserName || null,
+    userAgent: payload.userAgent || null,
+    deviceLabel: payload.deviceLabel || null,
+    vapidKeyHash: payload.vapidKeyHash || null,
+    lastSeenAt: payload.lastSeenAt || now,
+    createdAt: payload.createdAt || now,
+    updatedAt: payload.updatedAt || now,
+  })
 }
 
 export default buildNotificationRecord

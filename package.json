@@ -11,7 +11,9 @@
     "format": "prettier --write src/",
     "sitemap": "node generateSitemap.js",
     "hosting": "firebase deploy --only hosting",
-    "functions": "firebase deploy --only functions"
+    "functions": "firebase deploy --only functions",
+    "predev": "node scripts/write-firebase-sw-config.mjs",
+    "prebuild": "node scripts/write-firebase-sw-config.mjs"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.7.1",
@@ -36,6 +38,8 @@
     "@unhead/vue": "^2.1.12",
     "@vitejs/plugin-vue": "^6.0.1",
     "chalk": "^5.6.2",
+    "dotenv": "^17.4.2",
+    "eslint-plugin-vue": "^10.9.0",
     "prettier": "^3.1.0",
     "vite-ssg": "^28.3.0"
   }

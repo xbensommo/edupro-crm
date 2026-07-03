@@ -17,6 +17,7 @@ import { createNotificationTemplateService } from './createNotificationTemplateS
 export function createNotificationBridge(options = {}) {
   const recipientField = options.recipientField || 'user_id'
   const repository = createNotificationRepository({ store: options.store, recipientField })
+  
   const recipientsService = createNotificationRecipientsService({
     store: options.store,
     currentUser: options.currentUser,

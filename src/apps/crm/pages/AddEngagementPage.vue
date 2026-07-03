@@ -260,16 +260,7 @@
           <div class="grid gap-4 md:grid-cols-2">
             <label class="grid gap-2 md:col-span-2">
               <span class="field-label mb-0">Assigned consultant</span>
-              <!-- <select v-model="form.assignedConsultantId" class="select-field">
-                <option value="">Select consultant</option>
-                <option
-                  v-for="consultant in consultantsList"
-                  :key="getRecordId(consultant)"
-                  :value="assignConsultant(consultant)"
-                >
-                  {{ consultantDisplayName(consultant) }}
-                </option>
-              </select> -->
+            
 
               <select
                 v-model="form.assignedConsultantId"
@@ -815,11 +806,6 @@ function consultantDisplayName(usr) {
   let { data } = usr;
   return [data.firstName, data.lastName].filter(Boolean).join(' ') || data.displayName || data.email;
 }
-
-/*function assignConsultant(usr){
-  form.assignedConsultantInfo = `${usr.data.firstName} ${usr.data.lastName}`;
-  return usr.id;
-}*/
 
 function syncSelectedConsultantInfo() {
   const consultant = selectedConsultant.value
