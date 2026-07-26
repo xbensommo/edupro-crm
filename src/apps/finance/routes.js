@@ -7,6 +7,7 @@ const FinanceDashboardPage = () => import('./pages/FinanceDashboardPage.vue')
 const FinanceTransactionsPage = () => import('./pages/FinanceTransactionsPage.vue')
 const FinancePaymentsPage = () => import('./pages/FinancePaymentsPage.vue')
 const FinanceInvoicesPage = () => import('./pages/FinanceInvoicesPage.vue')
+const FinanceReceiptsPage = () => import('./pages/FinanceReceiptsPage.vue')
 const FinanceQuotationPage = () => import('./pages/FinanceQuotationPage.vue')
 const FinanceReceivablesPage = () => import('./pages/FinanceReceivablesPage.vue')
 const FinanceAuditPage = () => import('./pages/FinanceAuditPage.vue')
@@ -79,6 +80,18 @@ export default [
     component: FinanceQuotationPage,
     meta: {
       title: 'Quotation',
+      requiresAuth: true,
+      feature: 'Billing',
+      app: 'Billing',
+      permission: 'finance.quotation.read',
+      roles: ['admin', 'receptionist'],
+    },
+  },{
+    path: '/a/receipts',
+    name: 'Receipts',
+    component: FinanceReceiptsPage,
+    meta: {
+      title: 'Receipts',
       requiresAuth: true,
       feature: 'Billing',
       app: 'Billing',

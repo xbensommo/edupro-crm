@@ -16,6 +16,25 @@ const EMAIL_EVENTS = new Set([
   'finance.commission.paid',
   'auth.user.invited',
   'auth.user.suspended',
+
+  'finance.quotation.ready',
+  'finance.quotation.accepted',
+  'finance.invoice.issued',
+  'finance.invoice.overdue',
+  'finance.payment.received',
+  'finance.receipt.ready',
+  'finance.commission.deducted',
+  'finance.commission.paid',
+
+    'crm.review.approved',
+  'crm.assignment.accepted',
+   // Finance events
+  'finance.invoice.overdue',
+  'finance.payment.received',
+  'finance.receipt.ready',
+  'finance.commission.ready',
+  'finance.payment.logged', // alias for backward compatibility
+  'auth.role.changed',
 ])
 
 function lockKey(value) {
@@ -64,7 +83,6 @@ exports.onNotificationDeliveryQueued = onDocumentCreated(
     memory: FUNCTION_CONFIG.memory,
     concurrency: FUNCTION_CONFIG.concurrency,
     document: 'notification_delivery_queue/{queueId}',
-    secrets: ['EMAIL_PASS'],
     retry: false,
   },
   async (event) => {

@@ -1,137 +1,41 @@
 /**
  * @file src/services/quotationPdfEngine.js
- * @description Reusable browser-side quotation PDF generator using structured quotation data.
- *
- * Install:
- * npm i pdfmake
- * npm i @fortawesome/fontawesome-free
+ * @description Financial-grade quotation PDF generator.
  */
 
-import pdfMake from 'pdfmake/build/pdfmake'
-import pdfFonts from 'pdfmake/build/vfs_fonts'
 import { quotationCompanyProfile } from '../config/quotationCompanyProfile.js'
-
-// Import Font Awesome for icons
-import '@fortawesome/fontawesome-free/css/all.min.css'
-
-pdfMake.vfs = pdfFonts?.pdfMake?.vfs || pdfFonts?.vfs
-
-const DEFAULT_CURRENCY = 'NAD'
-
 import logoUrl from '@/assets/images/logo.png'
+import {
+  S,
+  safeText,
+  safeNumber,
+  money,
+  dateText,
+  fileSafe,
+  imageUrlToDataUrl,
+  commonStyles,
+  tableLayout,
+  buildFooter,
+} from './pdfCommon.js'
+import pdfMake from 'pdfmake/build/pdfmake'
 
-function safeText(value, fallback = '—') {
-  const text = String(value ?? '').trim()
-  return text || fallback
-}
-
-function safeNumber(value, fallback = 0) {
-  const number = Number(value)
-  return Number.isFinite(number) ? number : fallback
-}
-
-function money(value, currency = DEFAULT_CURRENCY) {
-  return new Intl.NumberFormat('en-NA', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(safeNumber(value))
-}
-
-function dateText(value) {
-  if (!value) return '—'
-
-  if (value?.toDate && typeof value.toDate === 'function') {
-    const date = value.toDate()
-    if (!isNaN(date.getTime())) {
-      return new Intl.DateTimeFormat('en-NA', {
-        year: 'numeric',
-        month: 'long',
-        day: '2-digit',
-      }).format(date)
-    }
-  }
-
-  let date
-  if (value?.seconds !== undefined) {
-    date = new Date(value.seconds * 1000)
-  } else {
-    date = new Date(value)
-  }
-
-  if (isNaN(date.getTime())) return '—'
-
-  return new Intl.DateTimeFormat('en-NA', {
-    year: 'numeric',
-    month: 'long',
-    day: '2-digit',
-  }).format(date)
-}
-
-function fileSafe(value) {
-  return String(value || 'quotation')
-    .trim()
-    .replace(/[^a-z0-9-_]+/gi, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .toLowerCase()
-}
-
-async function imageUrlToDataUrl(url) {
-  if (!url) return null
-
-  try {
-    const response = await fetch(url)
-
-    if (!response.ok) {
-      console.warn('[quotation-pdf] Failed to load logo image:', response.status)
-      return null
-    }
-
-    const blob = await response.blob()
-
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result)
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
-  } catch (error) {
-    console.warn('[quotation-pdf] Error loading logo image:', error)
-    return null
-  }
-}
-
+// --- Local helpers specific to quotation ---
 function normalizeLineItems(quotation) {
   const rawItems = Array.isArray(quotation?.data?.lineItems) ? quotation.data.lineItems : []
-
-  if (!rawItems.length) {
-    console.debug('[normalizeLineItems] No line items found, using fallback')
-  }
-
   if (!rawItems.length) {
     const total = safeNumber(quotation?.data?.totalAmount ?? quotation?.data?.amount)
-    
-    return [
-      {
-        number: 1,
-        description: safeText(
-          quotation?.data?.description || 
-          quotation?.data?.reference?.value || 
-          'Professional service'
-        ),
-        quantity: 1,
-        unitPrice: total,
-        total,
-      },
-    ]
+    return [{
+      number: 1,
+      description: safeText(quotation?.data?.description || quotation?.data?.reference?.value || 'Professional service'),
+      quantity: 1,
+      unitPrice: total,
+      total,
+    }]
   }
-
   return rawItems.map((item, index) => {
     const quantity = safeNumber(item?.quantity, 1)
     const unitPrice = safeNumber(item?.unitPrice ?? item?.price ?? item?.amount)
     const total = safeNumber(item?.totalAmount ?? item?.total ?? quantity * unitPrice)
-
     return {
       number: index + 1,
       description: safeText(item?.description || item?.label || item?.name, 'Quotation item'),
@@ -142,19 +46,123 @@ function normalizeLineItems(quotation) {
   })
 }
 
-function buildBankingDetailsTable(company) {
+// --- Core Builder ---
+function buildDocDefinition({ quotation, company, logoDataUrl, title = 'QUOTATION' }) {
+  const data = quotation?.data || {}
+  const currency = data?.currency || 'NAD'
+  const lineItems = normalizeLineItems(quotation)
+
+  const subtotal = lineItems.reduce((sum, item) => sum + safeNumber(item.total), 0)
+  const discount = safeNumber(data?.discountAmount)
+  const tax = safeNumber(data?.taxAmount)
+  const total = safeNumber(data?.totalAmount ?? subtotal - discount + tax)
+  const deposit = safeNumber(data?.depositAmount ?? data?.depositRequired)
+
+  
+
+  const quoteCode = safeText(data?.quoteCode || data?.quotationCode || data?.number || quotation?.id, 'Quotation')
+  const quoteDate = dateText(data?.quoteDate || data?.issueDate || data?.createdAt)
+  const validUntil = dateText(data?.validUntil || data?.expiryDate)
+
+  // --- Header ---
+  const headerLeft = [
+    logoDataUrl ? { image: logoDataUrl, width: 60, height: 60, fit: [60, 60], margin: [0, 0, 0, S.xs] } : null,
+    { text: safeText(company?.name, 'Company'), style: 'companyName' },
+    company?.tagline ? { text: company.tagline, style: 'companyTagline' } : null,
+    { text: [company?.phone, company?.email].filter(Boolean).join(' | '), style: 'companyContact' },
+    { text: (Array.isArray(company?.addressLines) ? company.addressLines.join(', ') : ''), style: 'companyContact' },
+  ].filter(Boolean)
+
+  const headerRight = [
+    { text: title, style: 'documentTitle' },
+    { text: `# ${quoteCode}`, style: 'documentCode' },
+    { text: `Issue Date: ${quoteDate}`, style: 'metaText' },
+    { text: `Expiry Date: ${validUntil}`, style: 'metaText' },
+    { text: `Currency: ${currency}`, style: 'metaText' },
+    //data?.status ? { text: `Status: ${data.status.toUpperCase()}`, style: 'metaText' } : null,
+  ].filter(Boolean)
+
+  // --- Client & Details ---
+  const client = data?.client || {}
+  const clientStack = [
+    { text: 'Prepared For', style: 'sectionHeader' },
+    { text: safeText(client?.name), style: 'clientName' },
+    client?.email ? { text: client.email, style: 'clientDetail' } : null,
+    client?.phone ? { text: client.phone, style: 'clientDetail' } : null,
+    client?.number ? { text: `Client #: ${client.number}`, style: 'clientDetail' } : null,
+  ].filter(Boolean)
+
+  const detailsStack = [
+    { text: 'Quotation Details', style: 'sectionHeader' },
+    { text: `Date: ${quoteDate}`, style: 'detailText' },
+    { text: `Valid Until: ${validUntil}`, style: 'detailText' },
+    data?.reference?.value ? { text: `${safeText(data.reference.label, 'Reference')}: ${data.reference.value}`, style: 'detailText' } : null,
+  ].filter(Boolean)
+
+  // --- Line Items Table ---
+  const tableHeaders = ['#', 'Description', 'Qty', 'Unit Price', 'Total']
+  const tableWidths = [28, '*', 45, 80, 80]
+  const tableBody = [
+    tableHeaders.map(text => ({ text, style: 'tableHeader' })),
+    ...lineItems.map((item) => [
+      { text: String(item.number), style: 'cellText' },
+      { text: item.description, style: 'cellText' },
+      { text: String(item.quantity), style: 'cellText', alignment: 'right' },
+      { text: money(item.unitPrice, currency), style: 'cellText', alignment: 'right' },
+      { text: money(item.total, currency), style: 'cellText', alignment: 'right' },
+    ]),
+  ]
+
+  // --- Summary ---
+  const summaryRows = []
+  summaryRows.push([
+    { text: 'Subtotal', style: 'summaryLabel' },
+    { text: money(subtotal, currency), style: 'summaryValue' },
+  ])
+  if (discount > 0) {
+    summaryRows.push([
+      { text: 'Discount', style: 'summaryLabel' },
+      { text: `- ${money(discount, currency)}`, style: 'summaryDiscount' },
+    ])
+  }
+  if (tax > 0) {
+    summaryRows.push([
+      { text: 'Tax', style: 'summaryLabel' },
+      { text: money(tax, currency), style: 'summaryValue' },
+    ])
+  }
+  summaryRows.push([
+    { text: 'Grand Total', style: 'totalLabel' },
+    { text: money(total, currency), style: 'totalValue' },
+  ])
+  if (deposit > 0) {
+    summaryRows.push([
+      { text: 'Deposit Required', style: 'summaryLabel' },
+      { text: money(deposit, currency), style: 'summaryValue' },
+    ])
+  }
+
+  // --- Terms & Banking ---
+  const terms = Array.isArray(data?.terms) ? data.terms : []
+  const termsStack = []
+  if (data?.notes || terms.length) {
+    termsStack.push({ text: 'Terms & Notes', style: 'sectionHeader', margin: [0, S.lg, 0, S.sm] })
+    if (data?.notes) {
+      termsStack.push({ text: data.notes, style: 'bodyText', margin: [0, 0, 0, S.sm] })
+    }
+    if (terms.length) {
+      termsStack.push({
+        ul: terms.map(term => ({ text: term, style: 'bodyText', margin: [0, 2, 0, 2] })),
+        margin: [0, 0, 0, 0],
+      })
+    }
+  }
+
   const banking = company?.bankingDetails
-
-  if (!banking) return null
-
-  return {
-    margin: [0, 30, 0, 0],
-    stack: [
-      {
-        text: 'Banking Details',
-        style: 'sectionHeader',
-        margin: [0, 0, 0, 12],
-      },
+  const bankingStack = []
+  if (banking) {
+    bankingStack.push(
+      { text: 'Banking Details', style: 'sectionHeader', margin: [0, S.lg, 0, S.sm] },
       {
         table: {
           widths: ['30%', '70%'],
@@ -163,611 +171,138 @@ function buildBankingDetailsTable(company) {
             ['Account Name', safeText(banking.accountName)],
             ['Account Number', safeText(banking.accountNumber)],
             ['Branch Code', safeText(banking.branchCode)],
-            ['Account Type', safeText(banking.accountType)],
-            ['Payment Reference', safeText(banking.referenceNote)],
+            ['Reference', safeText(banking.referenceNote)],
           ].map(([label, value]) => [
-            {
-              text: label,
-              bold: true,
-              fontSize: 9,
-              color: '#475569',
-              margin: [0, 4, 0, 4],
-            },
-            {
-              text: value,
-              fontSize: 9,
-              color: '#0F172A',
-              margin: [0, 4, 0, 4],
-            },
+            { text: label, style: 'bankLabel' },
+            { text: value, style: 'bankValue' },
           ]),
         },
-        layout: {
-          hLineColor() {
-            return '#E2E8F0'
-          },
-          vLineColor() {
-            return '#E2E8F0'
-          },
-          paddingLeft: function(i, node) { return 6; },
-          paddingRight: function(i, node) { return 6; },
-          paddingTop: function(i, node) { return 2; },
-          paddingBottom: function(i, node) { return 2; },
-        },
-      },
+        layout: 'noBorders',
+        margin: [0, 0, 0, 0],
+      }
+    )
+  }
+
+  // Acceptance
+  const acceptanceBlock = data?.showAcceptance === false ? null : {
+    margin: [0, S.xl, 0, 0],
+    columns: [
+      { width: '50%', stack: [{ text: 'Accepted By', style: 'sectionHeader' }, { text: '\n\n_________________________\n', style: 'acceptanceLine' }, { text: 'Signature / Name', style: 'acceptanceLabel' }] },
+      { width: '50%', stack: [{ text: 'Date', style: 'sectionHeader' }, { text: '\n\n_________________________\n', style: 'acceptanceLine' }, { text: 'Date', style: 'acceptanceLabel' }] },
     ],
   }
-}
 
-function buildLineItemTable(lineItems, currency) {
-  return [
-    [
-      { text: '#', style: 'tableHeader' },
-      { text: 'Description', style: 'tableHeader' },
-      { text: 'Qty', style: 'tableHeader', alignment: 'right' },
-      { text: 'Unit Price', style: 'tableHeader', alignment: 'right' },
-      { text: 'Total', style: 'tableHeader', alignment: 'right' },
-    ],
-    ...lineItems.map((item) => [
-      { text: String(item.number), margin: [0, 6, 0, 6], fontSize: 9 },
-      { text: item.description, margin: [0, 6, 0, 6], fontSize: 9 },
-      { text: String(item.quantity), alignment: 'right', margin: [0, 6, 0, 6], fontSize: 9 },
-      { text: money(item.unitPrice, currency), alignment: 'right', margin: [0, 6, 0, 6], fontSize: 9 },
-      { text: money(item.total, currency), alignment: 'right', margin: [0, 6, 0, 6], fontSize: 9 },
-    ]),
-  ]
-}
-
-function companyStack(company) {
-  return [
-    { text: safeText(company?.name, 'Company'), style: 'companyName' },
-    company?.tagline ? { text: company.tagline, style: 'companyTagline' } : null,
-    company?.email ? { text: `${company.email}`, style: 'companyDetail' } : null,
-    company?.phone ? { text: `${company.phone}`, style: 'companyDetail' } : null,
-    company?.website ? { text: `${company.website}`, style: 'companyDetail' } : null,
-    ...(Array.isArray(company?.addressLines) ? company.addressLines.map((line) => ({ text: `${line}`, style: 'companyDetail' })) : []),
-    company?.registrationNumber ? { text: `Reg: ${company.registrationNumber}`, style: 'companyDetail' } : null,
-    company?.taxNumber ? { text: `Tax: ${company.taxNumber}`, style: 'companyDetail' } : null,
-  ].filter(Boolean)
-}
-
-function clientStack(client = {}) {
-  return [
-    { text: 'Prepared For', style: 'sectionHeader' },
-    { text: safeText(client?.name), style: 'clientName' },
-    client?.number ? { text: `Client No: ${client.number}`, style: 'clientDetail' } : null,
-    client?.email ? { text: `${client.email}`, style: 'clientDetail' } : null,
-    client?.phone ? { text: `${client.phone}`, style: 'clientDetail' } : null,
-    ...(Array.isArray(client?.addressLines) ? client.addressLines.map((line) => ({ text: `${line}`, style: 'clientDetail' })) : []),
-  ].filter(Boolean)
-}
-
-function referenceStack(reference = {}, quotation = {}) {
-  const data = quotation?.data || {}
-  
-  return [
-    { text: '📋 Reference', style: 'sectionHeader' },
-    reference?.label || reference?.value
-      ? { text: `${safeText(reference?.label, 'Reference')}: ${safeText(reference?.value)}`, style: 'referenceText' }
-      : null,
-    data?.status ? { text: `Status: ${data.status.toUpperCase()}`, style: 'referenceText' } : null,
-    data?.currency ? { text: `Currency: ${data.currency}`, style: 'referenceText' } : null,
-    data?.validityNote ? { text: data.validityNote, style: 'referenceText' } : null,
-  ].filter(Boolean)
-}
-
-function termsStack(quotation = {}) {
-  const data = quotation?.data || {}
-  const terms = Array.isArray(data?.terms) ? data.terms : []
-
-  if (!terms.length && !data?.notes) return []
-
-  const items = [
-    { text: 'Terms & Notes', style: 'sectionHeader', margin: [0, 30, 0, 12] },
-  ]
-
-  if (data?.notes) {
-    items.push({ 
-      text: data.notes, 
-      style: 'bodyText', 
-      margin: [0, 0, 0, 8] 
-    })
-  }
-
-  if (terms.length) {
-    items.push({
-      ul: terms.map(term => ({
-        text: term,
-        style: 'bodyText',
-        margin: [0, 2, 0, 2],
-      })),
-      margin: [0, 4, 0, 0],
-    })
-  }
-
-  return items
-}
-
-function acceptanceBlock(quotation = {}) {
-  const data = quotation?.data || {}
-  if (data?.showAcceptance === false) return null
-
-  return {
-    margin: [0, 40, 0, 0],
-    table: {
-      widths: ['*', '*'],
-      body: [
-        [
-          { 
-            text: 'Accepted By', 
-            style: 'sectionHeader', 
-            alignment: 'left',
-            margin: [0, 0, 0, 8],
-          },
-          { 
-            text: 'Date', 
-            style: 'sectionHeader', 
-            alignment: 'left',
-            margin: [0, 0, 0, 8],
-          },
-        ],
-        [
-          { 
-            text: '\n\n______________________________\n\n',
-            style: 'acceptanceLine',
-            alignment: 'left',
-          },
-          { 
-            text: '\n\n______________________________\n\n',
-            style: 'acceptanceLine',
-            alignment: 'left',
-          },
-        ],
-        [
-          {
-            text: 'Signature / Name',
-            style: 'acceptanceLabel',
-            alignment: 'left',
-          },
-          {
-            text: 'Date',
-            style: 'acceptanceLabel',
-            alignment: 'left',
-          },
-        ],
-      ],
-    },
-    layout: 'noBorders',
-  }
-}
-
-function buildDocDefinition({ quotation, company, logoDataUrl, title = 'QUOTATION' }) {
-  const data = quotation?.data || {}
-  const currency = data?.currency || DEFAULT_CURRENCY
-  const lineItems = normalizeLineItems(quotation)
-  
-  const subtotal = lineItems.reduce((sum, item) => sum + safeNumber(item.total), 0)
-  const discount = safeNumber(data?.discountAmount)
-  const total = safeNumber(data?.totalAmount ?? subtotal - discount)
-  const deposit = safeNumber(data?.depositAmount ?? data?.depositRequired)
-  
-  const quoteCode = safeText(
-    data?.quoteCode || 
-    data?.quotationCode || 
-    data?.number || 
-    quotation?.id, 
-    'Quotation'
-  )
-
-  // Build summary rows - only include if values exist and are > 0
-  const summaryRows = [
-    [
-      { text: 'Subtotal', style: 'summaryLabel' }, 
-      { text: money(subtotal, currency), style: 'summaryValue' }
-    ],
-  ]
-
-  // Only add discount row if discount exists and is > 0
-  if (discount > 0) {
-    summaryRows.push([
-      { text: 'Discount', style: 'summaryLabel' }, 
-      { text: `- ${money(discount, currency)}`, style: 'summaryDiscount' }
-    ])
-  }
-
-  summaryRows.push([
-    { text: 'Total', style: 'totalLabel' }, 
-    { text: money(total, currency), style: 'totalValue' }
-  ])
-
-  // Only add deposit row if deposit exists and is > 0
-  if (deposit > 0) {
-    summaryRows.push([
-      { text: 'Deposit Required', style: 'summaryLabel' }, 
-      { text: money(deposit, currency), style: 'summaryValue' }
-    ])
-  }
-
-  const quoteDate = dateText(data?.quoteDate || data?.issueDate || data?.createdAt)
-  const validUntil = dateText(data?.validUntil || data?.expiryDate)
-
-  const headerContent = [
-    {
-      columns: [
-        {
-          width: 'auto',
-          stack: [
-            logoDataUrl
-              ? {
-                  image: logoDataUrl,
-                  width: 70,
-                  height: 70,
-                  margin: [0, 0, 0, 8],
-                  fit: [70, 70], // Prevents stretching
-                }
-              : null,
-            ...companyStack(company).slice(0, 1),
-          ].filter(Boolean),
-        },
-        {
-          width: '*',
-          stack: [
-            { 
-              text: title, 
-              style: 'documentTitle', 
-              alignment: 'right',
-              margin: [0, 0, 0, 4],
-            },
-            { 
-              text: quoteCode, 
-              style: 'documentCode', 
-              alignment: 'right',
-              margin: [0, 0, 0, 16],
-            },
-            {
-              columns: [
-                { width: '*', text: '' },
-                {
-                  width: 'auto',
-                  stack: [
-                    { 
-                      text: `Quote Date: ${quoteDate}`,
-                      style: 'metaText',
-                      alignment: 'right',
-                    },
-                    { 
-                      text: `Valid Until: ${validUntil}`,
-                      style: 'metaText',
-                      alignment: 'right',
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-      columnGap: 20,
-    },
-  ]
-
-  headerContent.push({
-    canvas: [
-      {
-        type: 'line',
-        x1: 0,
-        y1: 20,
-        x2: 515,
-        y2: 20,
-        lineWidth: 2,
-        lineColor: '#1860A8',
-      },
-    ],
-    margin: [0, 16, 0, 24],
-  })
-
-  const content = [
-    ...headerContent,
-
-    {
-      columns: [
-        { 
-          width: '*', 
-          stack: clientStack(data?.client),
-          margin: [0, 0, 20, 0],
-        },
-        { 
-          width: '*', 
-          stack: referenceStack(data?.reference, quotation),
-          margin: [20, 0, 0, 0],
-        },
-      ],
-      columnGap: 0,
-      margin: [0, 0, 0, 28],
-    },
-
-    {
-      table: {
-        headerRows: 1,
-        widths: [28, '*', 45, 85, 85],
-        body: buildLineItemTable(lineItems, currency),
-      },
-      layout: {
-        fillColor(rowIndex) {
-          return rowIndex === 0 ? '#F8FAFC' : (rowIndex % 2 === 0 ? '#FFFFFF' : '#FAFBFC')
-        },
-        hLineColor() {
-          return '#E2E8F0'
-        },
-        vLineColor() {
-          return '#E2E8F0'
-        },
-        paddingLeft: function(i, node) { return 8; },
-        paddingRight: function(i, node) { return 8; },
-        paddingTop: function(i, node) { return 4; },
-        paddingBottom: function(i, node) { return 4; },
-      },
-      margin: [0, 0, 0, 24],
-    },
-
-    {
-      columns: [
-        { width: '*', text: '' },
-        {
-          width: 230,
-          table: {
-            widths: ['*', 95],
-            body: summaryRows,
-          },
-          layout: {
-            hLineWidth: function(i, node) { return 0; },
-            vLineWidth: function(i, node) { return 0; },
-            paddingLeft: function(i, node) { return 0; },
-            paddingRight: function(i, node) { return 0; },
-            paddingTop: function(i, node) { return 4; },
-            paddingBottom: function(i, node) { return 4; },
-          },
-          margin: [0, 0, 0, 0],
-        },
-      ],
-    },
-
-    ...termsStack(quotation),
-
-    buildBankingDetailsTable(company),
-
-    acceptanceBlock(quotation),
-  ]
-
-  content.push({
-    text: quotation?.footerNote || 'This quotation becomes binding only after acceptance and payment terms are confirmed.',
-    style: 'footerNote',
-    margin: [0, 30, 0, 0],
-    alignment: 'center',
-  })
-
+  // --- FINAL DOCUMENT ---
   return {
     pageSize: 'A4',
-    pageMargins: [50, 50, 50, 60],
-    content,
-
-    footer(currentPage, pageCount) {
-      return {
-        margin: [50, 0, 50, 20],
+    pageMargins: [S.page, S.page, S.page, S.page],
+    content: [
+      // Header
+      {
         columns: [
-          { 
-            text: company?.legalName || company?.name || '', 
-            style: 'footerText',
-            fontSize: 7,
-          },
-          { 
-            text: `Page ${currentPage} of ${pageCount}`, 
-            alignment: 'right', 
-            style: 'footerText',
-            fontSize: 7,
+          { width: '50%', stack: headerLeft, margin: [0, 0, S.md, 0] },
+          { width: '50%', stack: headerRight, alignment: 'right' },
+        ],
+        columnGap: S.md,
+        margin: [0, 0, 0, S.md],
+      },
+      // Divider
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1.5, lineColor: '#8E6E4E' }], margin: [0, 0, 0, S.lg] },
+
+      // Client & Details
+      {
+        columns: [
+          { width: '100%', stack: clientStack, margin: [0, 0, S.md, 0] },
+          // { width: '50%', stack: detailsStack },
+        ],
+        columnGap: S.md,
+        margin: [0, 0, 0, S.xl],
+      },
+
+      // Line Items
+      {
+        table: {
+          headerRows: 1,
+          widths: tableWidths,
+          body: tableBody,
+        },
+        layout: tableLayout,
+        margin: [0, 0, 0, S.lg],
+      },
+
+      // Summary
+      {
+        columns: [
+          { width: '*', text: '' },
+          {
+            width: '40%',
+            table: {
+              widths: ['*', 'auto'],
+              body: summaryRows.map((row, index) => {
+                const isTotal = row[0].text === 'Grand Total'
+                return row.map((cell, colIndex) => ({
+                  ...cell,
+                  margin: [0, (isTotal && colIndex === 0) ? S.sm : S.xs, 0, (isTotal && colIndex === 0) ? S.sm : S.xs],
+                }))
+              }),
+            },
+            layout: {
+              hLineWidth: (i) => {
+                if (i === summaryRows.length - 1) return 2.5
+                if (i === summaryRows.length - 2) return 0.5
+                return 0
+              },
+              hLineColor: (i) => i === summaryRows.length - 1 ? '#0F172A' : '#E2E8F0',
+              vLineWidth: () => 0,
+              paddingTop: () => 4,
+              paddingBottom: () => 4,
+            },
+            margin: [0, 0, 0, 0],
           },
         ],
-      }
-    },
+        margin: [0, 0, 0, S.lg],
+      },
 
-    styles: {
-      companyName: { 
-        fontSize: 22, 
-        bold: true, 
-        color: '#0F172A',
-        margin: [0, 0, 0, 2],
-      },
-      companyTagline: {
-        fontSize: 10,
-        color: '#475569',
-        margin: [0, 0, 0, 8],
-      },
-      companyDetail: {
-        fontSize: 8,
-        color: '#64748B',
-        margin: [0, 1, 0, 1],
-      },
-      documentTitle: { 
-        fontSize: 28, 
-        bold: true, 
-        color: '#0F172A',
-        letterSpacing: 1,
-      },
-      documentCode: { 
-        fontSize: 12, 
-        bold: true, 
-        color: '#1860A8',
-        margin: [0, 2, 0, 16],
-        letterSpacing: 0.5,
-      },
-      metaText: {
-        fontSize: 8,
-        color: '#64748B',
-        margin: [0, 1, 0, 1],
-      },
-      sectionHeader: { 
-        fontSize: 10, 
-        bold: true, 
-        color: '#475569',
-        letterSpacing: 0.5,
-        margin: [0, 0, 0, 6],
-      },
-      clientName: { 
-        fontSize: 14, 
-        bold: true, 
-        color: '#0F172A',
-        margin: [0, 0, 0, 4],
-      },
-      clientDetail: {
-        fontSize: 9,
-        color: '#475569',
-        margin: [0, 1, 0, 1],
-      },
-      referenceText: {
-        fontSize: 9,
-        color: '#0F172A',
-        margin: [0, 2, 0, 2],
-      },
-      tableHeader: { 
-        fontSize: 9, 
-        bold: true, 
-        color: '#0F172A',
-        margin: [0, 6, 0, 6],
-        fillColor: '#F8FAFC',
-      },
-      summaryLabel: { 
-        fontSize: 9, 
-        color: '#64748B', 
-        margin: [0, 3, 0, 3],
-      },
-      summaryValue: { 
-        fontSize: 9, 
-        bold: true, 
-        color: '#0F172A', 
-        alignment: 'right', 
-        margin: [0, 3, 0, 3],
-      },
-      summaryDiscount: {
-        fontSize: 9,
-        bold: true,
-        color: '#EF4444',
-        alignment: 'right',
-        margin: [0, 3, 0, 3],
-      },
-      totalLabel: { 
-        fontSize: 12, 
-        bold: true, 
-        color: '#0F172A', 
-        margin: [0, 6, 0, 3],
-      },
-      totalValue: { 
-        fontSize: 12, 
-        bold: true, 
-        color: '#0F172A', 
-        alignment: 'right', 
-        margin: [0, 6, 0, 3],
-      },
-      bodyText: { 
-        fontSize: 9, 
-        color: '#0F172A',
-        lineHeight: 1.5,
-      },
-      acceptanceLine: {
-        fontSize: 10,
-        color: '#0F172A',
-      },
-      acceptanceLabel: {
-        fontSize: 8,
-        color: '#94A3B8',
-        margin: [0, 4, 0, 0],
-      },
-      footerNote: { 
-        fontSize: 9, 
-        color: '#64748B',
-        italic: true,
-        margin: [0, 30, 0, 0],
-      },
-      footerText: { 
-        fontSize: 8, 
-        color: '#94A3B8',
-      },
-    },
+      ...termsStack,
+      ...bankingStack,
+      //acceptanceBlock,
 
-    defaultStyle: {
-      fontSize: 10,
-      color: '#0F172A',
-    },
+      // Footer Note
+      {
+        text: quotation?.footerNote || 'This quotation is an offer and becomes binding only upon 50% deposit payment.',
+        style: 'footerNote',
+        margin: [0, S.xxl, 0, 0],
+        alignment: 'center',
+      },
+    ],
+
+    footer: buildFooter(company),
+
+    styles: commonStyles,
   }
 }
 
-/**
- * Downloads a structured quotation as PDF.
- *
- * @param {object} quotation Generic quotation payload.
- * @param {object} options Optional PDF settings.
- * @param {object} options.company Override company profile.
- * @param {string} options.logoUrl Override logo URL.
- * @param {string} options.title PDF title. Defaults to QUOTATION.
- * @param {string} options.filename Override output filename.
- * @returns {Promise<void>}
- */
+// --- Export functions ---
 export async function downloadQuotationPdf(quotation, options = {}) {
   if (!quotation || typeof quotation !== 'object') {
     throw new Error('[quotation-pdf] Missing quotation payload.')
   }
-
-  const company = {
-    ...quotationCompanyProfile,
-    ...(options.company || {}),
-  }
-
+  const company = { ...quotationCompanyProfile, ...(options.company || {}) }
   const logoDataUrl = await imageUrlToDataUrl(options?.logoUrl || logoUrl)
-  
   const data = quotation?.data || {}
-  const quoteCode = safeText(
-    data?.quoteCode || 
-    data?.quotationCode || 
-    data?.number || 
-    quotation?.id, 
-    'quotation'
-  )
-  
+  const quoteCode = safeText(data?.quoteCode || data?.quotationCode || data?.number || quotation?.id, 'quotation')
   const filename = options?.filename || `${fileSafe(quoteCode)}.pdf`
 
-  const docDefinition = buildDocDefinition({
-    quotation,
-    company,
-    logoDataUrl,
-    title: options?.title || 'QUOTATION',
-  })
-
+  const docDefinition = buildDocDefinition({ quotation, company, logoDataUrl, title: options?.title || 'QUOTATION' })
   pdfMake.createPdf(docDefinition).download(filename)
 }
 
-/**
- * Opens a structured quotation as PDF in a new browser tab.
- *
- * @param {object} quotation Generic quotation payload.
- * @param {object} options Optional PDF settings.
- * @returns {Promise<void>}
- */
 export async function openQuotationPdf(quotation, options = {}) {
   if (!quotation || typeof quotation !== 'object') {
     throw new Error('[quotation-pdf] Missing quotation payload.')
   }
-
-  const company = {
-    ...quotationCompanyProfile,
-    ...(options.company || {}),
-  }
-
+  const company = { ...quotationCompanyProfile, ...(options.company || {}) }
   const logoDataUrl = await imageUrlToDataUrl(options?.logoUrl || logoUrl)
-  
-  const docDefinition = buildDocDefinition({
-    quotation,
-    company,
-    logoDataUrl,
-    title: options?.title || 'QUOTATION',
-  })
-
+  const docDefinition = buildDocDefinition({ quotation, company, logoDataUrl, title: options?.title || 'QUOTATION' })
   pdfMake.createPdf(docDefinition).open()
 }

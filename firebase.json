@@ -60,6 +60,7 @@
       "enabled": true,
       "port": 0
     },
+    "pubsub": { "port": 8085 },  
     "singleProjectMode": true
   },
   "auth": {

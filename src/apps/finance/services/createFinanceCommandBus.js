@@ -58,7 +58,7 @@ function normalizeLineItem(line = {}, index = 0) {
     sortOrder: Number(line.sortOrder ?? index),
   }
 }
-
+ 
 function normalizeInvoicePayload(payload = {}, actor = null) {
   invariant(payload.clientId, 'clientId is required to create an invoice.', { code: 'FINANCE_INVOICE_CLIENT_REQUIRED' })
   const lineItems = Array.isArray(payload.lineItems) && payload.lineItems.length
@@ -412,7 +412,8 @@ export function createFinanceCommandBus({ repositories, confirm, getCurrentUser,
       return { status: 'allocated', allocation, invoice: nextInvoice }
     },
 
-    async logClientPayment(payload) {
+    //async logClientPayment(payload) {
+    async logClientPayment(payload, options = { autoAllocate: false }) {
       const user = currentUser()
       requireFinance(user, FINANCE_ACTIONS.PAYMENT_LOG)
       invariant(repositories?.payments?.add, 'Payments repository is required.', { code: 'FINANCE_PAYMENTS_REPOSITORY_REQUIRED' })
@@ -453,7 +454,18 @@ export function createFinanceCommandBus({ repositories, confirm, getCurrentUser,
 
       await repositories.payments.update(payment.id, { financeTransactionId: transaction.id }, shardDateOptions(payment.paymentDate))
       await writeAudit({ action: 'payment.log', entityType: 'payment', entityId: payment.id, entityLabel: payment.paymentCode, actor: user, after: { payment, transaction } })
-      await notifyFinanceOps('finance.payment.logged', payment, user, { entityType: 'payment', actionUrl: '/finance/payments', actionLabel: 'Open payments' })
+      await notifyFinanceOps('finance.payment.logged', payment, user, { entityType: 'payment', actionUrl: '/finance/payments', actionLabel: 'Open payments' });
+
+
+      // Auto-allocate if requested
+      if (options.autoAllocate && allocatePaymentToInvoice) {
+        try {
+          await allocatePaymentToInvoice({ paymentId: payment.id, invoiceId: null, amount: payment.amount, notes: 'Auto-allocation on payment log' })
+        } catch (allocError) {
+          console.warn('Auto-allocation failed:', allocError.message)
+        }
+      }
+
       return { payment, transaction }
     },
 

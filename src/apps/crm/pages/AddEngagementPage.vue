@@ -1258,6 +1258,9 @@ async function submitEngagement() {
       errorMessage.value = `Some files failed: ${uploadSummary.failed.map((item) => item.name).join(', ')}`
     } else {
       successMessage.value = `Work ${engagementCode} saved successfully.${uploadSummary.uploaded.length ? ` ${uploadSummary.uploaded.length} file(s) uploaded.` : ''}`
+
+      // Add note about automatic invoice generation
+      successMessage.value += ' An invoice will be generated automatically.'
     }
   } catch (error) {
     errorMessage.value = error?.message || 'Failed to save work.'

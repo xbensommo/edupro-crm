@@ -33,7 +33,7 @@ const BRAND = Object.freeze({
    */
   logoUrl:
     process.env.BRAND_LOGO_URL ||
-    `${APP_DOMAIN.replace(/\/$/, '')}/edupro-logo.png`,
+    `${APP_DOMAIN.replace(/\/$/, '')}/logo.png`,
 
   colors: Object.freeze({
     primary: '#8E6E4E',

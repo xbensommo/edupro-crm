@@ -6,7 +6,7 @@ import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import { getMessaging, isSupported } from 'firebase/messaging'
 
 const isClient = typeof window !== 'undefined'
-const isProd = true; //import.meta.env.PROD
+const isProd = false; //import.meta.env.PROD
 const vars = import.meta.env
 
 const isLocalhost =

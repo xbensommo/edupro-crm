@@ -21,6 +21,8 @@ import {
   withActivityLog,
 } from '@core_services/index.js'
 
+import { useFinanceAppStore } from '@apps/finance/stores/useFinanceAppStore.js'
+
 /**
  * Stable collection names owned by the CRM app.
  */
@@ -1515,8 +1517,17 @@ export function createCrmService() {
   async function fetchRecentEngagements(params = {}) {
     try { return await fetchCollection(CRM_COLLECTIONS.engagements, params) } catch (error) { throw normalizeCrmError(error, 'Failed to load engagements.', context) }
   }
+  async function createInvoiceForEngagement(engagement) {
+      const financeStore = useFinanceAppStore()
+      // Ensure finance store is ready (it will load collections)
+      await financeStore.ensureReady()
+      return financeStore.createInvoiceForEngagement(engagement)
+    }
+
   async function createEngagements(payload) {
-    assertWrite('crm:write')
+    assertWrite('crm:write');
+
+    
 
     try {
       return await withActivityLog(
@@ -1524,7 +1535,15 @@ export function createCrmService() {
           const engagement = await add(CRM_COLLECTIONS.engagements, buildEngagemnetPayload(payload, context))
           const normalized = { ...(engagement || {}), ...(engagement?.data || {}), id: engagement?.id || engagement?.docId || engagement?._id || null }
 
-          await feedFinanceFromEngagement(normalized, 'create')
+          await feedFinanceFromEngagement(normalized, 'create');
+
+          // Auto-create invoice from this engagement
+          try {
+            await createInvoiceForEngagement(normalized)
+          } catch (invoiceError) {
+            console.warn('Failed to auto-create invoice for engagement:', invoiceError.message)
+          }
+          
           return engagement
         },
         {
@@ -1609,7 +1628,7 @@ export function createCrmService() {
     createEngagementCode,
     clientPrimaryLabel,
     money,
-    asMoney,
+    
     clientSecondaryLabel,
     formatDate,
     formatFileSize,

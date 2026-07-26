@@ -1,0 +1,46 @@
+--- a/src/features/notifications/services/createNotificationTemplateService.js
++++ b/src/features/notifications/services/createNotificationTemplateService.js
+@@ -42,18 +42,31 @@
+   'finance.payment.logged': {
+     title: 'Client payment logged',
+     body: '{{ actorName }} logged payment of {{ amountPaid }} for {{ entityLabel }}.',
+   },
+   'finance.commission.ready': {
+     title: 'Commission ready',
+     body: 'Your commission for {{ entityLabel }} is ready. Amount: {{ amountDue }}.',
+   },
+   'finance.commission.deducted': {
+     title: 'Commission deduction applied',
+     body: 'A deduction was applied to {{ entityLabel }}. Deduction: {{ deductionLabel }}.',
+   },
+   'finance.commission.paid': {
+     title: 'Commission paid',
+     body: 'Your commission for {{ entityLabel }} has been paid. Amount: {{ amountPaid }}.',
+   },
++  'finance.invoice.issued': {
++    title: 'Invoice issued',
++    body: 'Invoice {{ invoiceNumber }} for {{ clientName }} has been issued. Amount: {{ amount }}. Due: {{ dueDate }}.',
++  },
++  'finance.invoice.overdue': {
++    title: 'Invoice overdue',
++    body: 'Invoice {{ invoiceNumber }} for {{ clientName }} is overdue. Amount due: {{ amountDue }}.',
++  },
++  'finance.payment.received': {
++    title: 'Payment received',
++    body: 'Payment of {{ amount }} received from {{ clientName }}. Reference: {{ reference }}.',
++  },
++  'finance.receipt.ready': {
++    title: 'Receipt ready',
++    body: 'Receipt {{ receiptNumber }} for {{ clientName }} is ready.',
++  },
++  'finance.quotation.ready': {
++    title: 'Quotation ready',
++    body: 'Quotation {{ quotationNumber }} for {{ clientName }} is ready. Amount: {{ amount }}.',
++  },
++  'finance.quotation.accepted': {
++    title: 'Quotation accepted',
++    body: '{{ clientName }} accepted quotation {{ quotationNumber }}.',
++  },
+   'auth.user.invited': {
+     title: 'You were invited to EduProLIC',
+     body: '{{ actorName }} invited you to join EduProLIC as {{ roleName }}.',

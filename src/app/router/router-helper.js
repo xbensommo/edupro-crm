@@ -5,60 +5,60 @@
 import accessConfig from '@config/access.config.js'
 
 const defaults = {
-  appName: 'Totisoft Cc',
+  appName: 'EduPro Toti-CRM',
   sensitiveRoles: [],
   googleAnalyticsId: null,
-  errorRoutes: (loader) => [
-    {
-      path: '/400',
-      name: '400',
-      component: loader('400'),
-      props: (route) => ({
-        code: '400',
-        message: route.query.message,
-        description: route.query.reason,
-      }),
-    },
-    {
-      path: '/401',
-      name: '401',
-      component: loader('401'),
-      props: (route) => ({
-        code: '401',
-        message: route.query.message,
-        description: route.query.reason,
-      }),
-    },
-    {
-      path: '/403',
-      name: '403',
-      component: loader('403'),
-      props: (route) => ({
-        code: '403',
-        message: route.query.message,
-        description: route.query.reason,
-      }),
-    },
-    {
-      path: '/500',
-      name: '500',
-      component: loader('500'),
-      props: (route) => ({
-        code: '500',
-        message: route.query.message,
-        description: route.query.reason,
-      }),
-    },
-    {
-      path: '/:pathMatch(.*)*',
-      name: '404',
-      component: loader('404'),
-      props: {
-        code: '404',
-        message: 'Page Not Found',
-      },
-    },
-  ],
+  // errorRoutes: (loader) => [
+  //   {
+  //     path: '/400',
+  //     name: '400',
+  //     component: loader('400'),
+  //     props: (route) => ({
+  //       code: '400',
+  //       message: route.query.message,
+  //       description: route.query.reason,
+  //     }),
+  //   },
+  //   {
+  //     path: '/401',
+  //     name: '401',
+  //     component: loader('401'),
+  //     props: (route) => ({
+  //       code: '401',
+  //       message: route.query.message,
+  //       description: route.query.reason,
+  //     }),
+  //   },
+  //   {
+  //     path: '/403',
+  //     name: '403',
+  //     component: loader('403'),
+  //     props: (route) => ({
+  //       code: '403',
+  //       message: route.query.message,
+  //       description: route.query.reason,
+  //     }),
+  //   },
+  //   {
+  //     path: '/500',
+  //     name: '500',
+  //     component: loader('500'),
+  //     props: (route) => ({
+  //       code: '500',
+  //       message: route.query.message,
+  //       description: route.query.reason,
+  //     }),
+  //   },
+  //   {
+  //     path: '/:pathMatch(.*)*',
+  //     name: '404',
+  //     component: loader('404'),
+  //     props: {
+  //       code: '404',
+  //       message: 'Page Not Found',
+  //     },
+  //   },
+  // ],
 }
 
 /**

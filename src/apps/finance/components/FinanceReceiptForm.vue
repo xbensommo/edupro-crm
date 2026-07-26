@@ -5,7 +5,7 @@
         class="relative max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[32px] border border-[var(--color-neutral-dark,#E2E8F0)] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.22)]"
         @submit.prevent="submit"
       >
-        <!-- Close button - top right -->
+        <!-- Close button -->
         <button
           type="button"
           class="absolute top-4 right-4 rounded-full p-2 text-[var(--color-text-light,#64748B)] transition-colors hover:bg-[var(--color-neutral,#F8FAFC)] hover:text-[var(--color-text,#0F172A)]"
@@ -26,16 +26,16 @@
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Client Estimate
+                  Client Receipts
                 </span>
               </p>
 
               <h2 class="mt-1.5 text-2xl font-semibold tracking-tight text-[var(--color-text,#0F172A)]">
-                Create Quotation
+                {{ isEditing ? 'Edit Receipt' : 'Create Receipt' }}
               </h2>
 
               <p class="mt-1 text-sm text-[var(--color-text-light,#64748B)]">
-                Fill in the details below to generate a professional quotation for your client.
+                {{ isEditing ? 'Update receipt details' : 'Create a receipt for client payment or refund' }}
               </p>
             </div>
           </div>
@@ -44,12 +44,12 @@
         <!-- Form Body -->
         <div class="p-6">
           <div class="space-y-6">
-            <!-- Section 1: Client Selection -->
+            <!-- Section 1: Client Information -->
             <section class="space-y-4">
               <div class="flex items-center gap-3">
                 <div class="h-6 w-1 rounded-full bg-[var(--color-primary,#1860A8)]"></div>
                 <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Client Information</h3>
-                <span class="text-xs text-[var(--color-text-light,#64748B)]">Who is this quotation for?</span>
+                <span class="text-xs text-[var(--color-text-light,#64748B)]">Who is this receipt for?</span>
               </div>
 
               <!-- Client Mode Toggle -->
@@ -194,229 +194,180 @@
               </div>
             </section>
 
-            <!-- Section 2: Quotation Details -->
+            <!-- Section 2: Receipt Details -->
             <section class="space-y-4">
               <div class="flex items-center gap-3">
                 <div class="h-6 w-1 rounded-full bg-[var(--color-primary,#1860A8)]"></div>
-                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Quotation Details</h3>
-                <span class="text-xs text-[var(--color-text-light,#64748B)]">Set the scope and terms</span>
+                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Receipt Details</h3>
+                <span class="text-xs text-[var(--color-text-light,#64748B)]">Payment information</span>
               </div>
 
               <div class="grid gap-4 sm:grid-cols-2">
                 <!-- <div>
                   <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Quotation Code
+                    Receipt Code
                   </label>
                   <input
-                    v-model.trim="form.quoteCode"
+                    v-model.trim="form.receiptCode"
                     class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
                     placeholder="Auto-generated if left blank"
                   >
                 </div> -->
 
-                <!-- <div>
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Receipt Type <span class="text-rose-500">*</span>
+                  </label>
+                  <select
+                    v-model="form.receiptType"
+                    required
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                    <option value="payment">Payment</option>
+                    <option value="refund">Refund</option>
+                    <option value="deposit">Deposit</option>
+                    <option value="credit_note">Credit Note</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Payment Date <span class="text-rose-500">*</span>
+                  </label>
+                  <input
+                    v-model="form.paymentDate"
+                    type="date"
+                    required
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Payment Method <span class="text-rose-500">*</span>
+                  </label>
+                  <select
+                    v-model="form.paymentMethod"
+                    required
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                  >
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cash">Cash</option>
+                    <option value="credit_card">Credit Card</option>
+                    <option value="debit_card">Debit Card</option>
+                    <option value="mobile_money">Mobile Money</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                    Amount <span class="text-rose-500">*</span>
+                  </label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-light,#64748B)]">NAD</span>
+                    <input
+                      v-model.number="form.amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] pl-14 pr-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                      placeholder="0.00"
+                    >
+                  </div>
+                </div>
+
+               <!--  <div>
                   <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
                     Status <span class="text-rose-500">*</span>
                   </label>
                   <select
                     v-model="form.status"
+                    required
                     class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
                   >
                     <option value="draft">Draft</option>
-                    <option value="sent">Sent</option>
+                    <option value="issued">Issued</option>
                   </select>
                 </div> -->
 
-                <div>
+                <div class="sm:col-span-2">
                   <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Quote Date <span class="text-rose-500">*</span>
+                    Reference Number
                   </label>
                   <input
-                    v-model="form.quoteDate"
-                    type="date"
-                    required
-                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                  >
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Valid Until
-                  </label>
-                  <input
-                    v-model="form.validUntil"
-                    type="date"
-                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                  >
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Reference Label
-                  </label>
-                  <input
-                    v-model.trim="form.referenceLabel"
+                    v-model.trim="form.referenceNumber"
                     class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                    placeholder="e.g., Project, Service, Engagement"
+                    placeholder="Payment reference or transaction ID"
                   >
                 </div>
 
-                <div>
+                <div class="sm:col-span-2">
                   <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Reference Value
+                    Description
                   </label>
                   <input
-                    v-model.trim="form.referenceValue"
+                    v-model.trim="form.description"
                     class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                    placeholder="e.g. Assignment Proofreading"
+                    placeholder="e.g., Payment for invoice INV-001"
                   >
                 </div>
               </div>
             </section>
 
-            <!-- Section 3: Line Items & Pricing -->
+            <!-- Section 3: Invoice & Payment Links -->
             <section class="space-y-4">
               <div class="flex items-center gap-3">
                 <div class="h-6 w-1 rounded-full bg-[var(--color-primary,#1860A8)]"></div>
-                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Line Items & Pricing</h3>
-                <span class="text-xs text-[var(--color-text-light,#64748B)]">What are you quoting for?</span>
+                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Linked Records</h3>
+                <span class="text-xs text-[var(--color-text-light,#64748B)]">Optional references</span>
               </div>
 
-              <div class="grid gap-4 sm:grid-cols-3">
-                <div class="sm:col-span-3">
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
                   <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Description <span class="text-rose-500">*</span>
+                    Invoice Code
                   </label>
                   <input
-                    v-model.trim="line.description"
-                    required
+                    v-model.trim="form.invoiceCode"
                     class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                    placeholder="What product or service are you quoting?"
+                    placeholder="e.g., INV-001"
                   >
                 </div>
 
                 <div>
                   <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Quantity <span class="text-rose-500">*</span>
+                    Payment Code
                   </label>
                   <input
-                    v-model.number="line.quantity"
-                    type="number"
-                    min="1"
-                    step="1"
-                    required
-                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    v-model.trim="form.paymentCode"
+                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
+                    placeholder="e.g., PAY-001"
                   >
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Unit Price <span class="text-rose-500">*</span>
-                  </label>
-                  <input
-                    v-model.number="line.unitPrice"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                  >
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Currency
-                  </label>
-                  <select
-                    v-model="form.currency"
-                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                  >
-                    <option value="NAD">NAD</option>
-                    <option value="ZAR">ZAR</option>
-                    <option value="USD">USD</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- Financial Summary Card -->
-              <div class="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Discount
-                  </label>
-                  <div class="relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-light,#64748B)]">{{ form.currency }}</span>
-                    <input
-                      v-model.number="form.discountAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] pl-8 pr-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                      placeholder="0.00"
-                    >
-                  </div>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Deposit Required
-                  </label>
-                  <div class="relative">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-light,#64748B)]">{{ form.currency }}</span>
-                    <input
-                      v-model.number="form.depositAmount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] pl-8 pr-4 py-2.5 text-sm transition-colors focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20"
-                      placeholder="0.00"
-                    >
-                  </div>
-                </div>
-
-                <div class="rounded-xl bg-[var(--color-primary,#1860A8)]/5 border border-[var(--color-primary,#1860A8)]/20 p-4 flex flex-col justify-center">
-                  <p class="text-xs font-medium uppercase tracking-[0.12em] text-[var(--color-primary,#1860A8)]">
-                    Estimated Total
-                  </p>
-                  <p class="mt-1 text-2xl font-bold text-[var(--color-primary,#1860A8)]">
-                    {{ estimatedTotalText }}
-                  </p>
                 </div>
               </div>
             </section>
 
-            <!-- Section 4: Terms & Notes -->
+            <!-- Section 4: Notes -->
             <section class="space-y-4">
               <div class="flex items-center gap-3">
                 <div class="h-6 w-1 rounded-full bg-[var(--color-primary,#1860A8)]"></div>
-                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Terms & Notes</h3>
-                <span class="text-xs text-[var(--color-text-light,#64748B)]">Additional information</span>
+                <h3 class="text-sm font-semibold text-[var(--color-text,#0F172A)]">Additional Information</h3>
+                <span class="text-xs text-[var(--color-text-light,#64748B)]">Optional notes</span>
               </div>
 
-              <div class="grid gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Notes
-                  </label>
-                  <!-- <textarea
-                    v-model.trim="form.notes"
-                    rows="2"
-                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20 resize-none"
-                    placeholder="Any additional notes for this quotation"
-                  /> -->
-                </div>
-
-                <!-- <div>
-                  <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
-                    Terms & Conditions
-                  </label>
-                  <textarea
-                    v-model.trim="termsText"
-                    rows="3"
-                    class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20 resize-none font-mono text-xs"
-                    placeholder="Enter each term on a new line&#10;e.g.,&#10;50% deposit is required before work begins&#10;Final payment due upon completion"
-                  />
-                </div> -->
+              <div>
+                <label class="block text-sm font-medium text-[var(--color-text,#0F172A)] mb-1.5">
+                  Notes
+                </label>
+                <textarea
+                  v-model.trim="form.notes"
+                  rows="3"
+                  class="w-full rounded-xl border border-[var(--color-neutral-dark,#E2E8F0)] px-4 py-2.5 text-sm transition-colors placeholder:text-[var(--color-text-light,#94A3B8)] focus:border-[var(--color-primary,#1860A8)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary,#1860A8)]/20 resize-none"
+                  placeholder="Any additional notes for this receipt"
+                />
               </div>
             </section>
           </div>
@@ -426,7 +377,7 @@
         <div class="border-t border-[var(--color-neutral,#F1F5F9)] p-6 bg-[var(--color-neutral,#F8FAFC)] rounded-b-[32px]">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-xs text-[var(--color-text-light,#64748B)]">
-              <span class="font-medium text-[var(--color-text,#0F172A)]">{{ estimatedTotalText }}</span> estimated total
+              <span class="font-medium text-[var(--color-text,#0F172A)]">{{ form.amount ? formatMoney(form.amount) : '0.00' }}</span> amount
             </p>
 
             <div class="flex flex-wrap gap-3">
@@ -451,7 +402,7 @@
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                {{ isSubmitting ? 'Creating...' : 'Create Quotation' }}
+                {{ isSubmitting ? 'Saving...' : isEditing ? 'Update Receipt' : 'Create Receipt' }}
               </button>
             </div>
           </div>
@@ -462,12 +413,21 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
+import { formatMoney } from '../services/financeFormatters.js'
 
 const props = defineProps({
   isSubmitting: {
     type: Boolean,
     default: false,
+  },
+  isEditing: {
+    type: Boolean,
+    default: false,
+  },
+  editData: {
+    type: Object,
+    default: null,
   },
   clients: {
     type: Array,
@@ -503,13 +463,6 @@ const today = new Date().toISOString().slice(0, 10)
 const clientMode = ref('manual')
 const selectedClientId = ref('')
 const selectedEngagementId = ref('')
-const termsText = ref(
-  "DEPOSIT: A 50% non-refundable deposit is required before we begin.\n" +
-  "FINAL PAYMENT: Pay the balance before we deliver your work. We will not release files until payment is complete.\n" +
-  "LATE GUIDELINES: If you send instructions after we have finished, we will charge extra for the changes.\n" +
-  "RUSH ORDERS: If you need the work in fewer than 5 days, we may add a rush fee."
-)
-
 
 const manualClient = reactive({
   name: '',
@@ -519,50 +472,63 @@ const manualClient = reactive({
 })
 
 const form = reactive({
-  quoteCode: '',
-  status: 'sent',
-  quoteDate: today,
-  validUntil: '',
+  receiptCode: '',
+  receiptType: 'payment',
+  paymentDate: today,
+  paymentMethod: 'bank_transfer',
+  amount: 0,
+  currency: 'NAD',
+  status: 'issued',
+  referenceNumber: '',
+  description: '',
+  notes: '',
+  invoiceId: '',
+  invoiceCode: '',
+  paymentId: '',
+  paymentCode: '',
   clientId: '',
-  clientNumber: '',
   clientLabel: '',
   clientEmail: '',
   clientPhone: '',
   engagementId: '',
   engagementCode: '',
-  referenceLabel: 'Project',
-  referenceValue: '',
-  discountAmount: 0,
-  depositAmount: 0,
-  currency: 'NAD',
-  notes: 'Send proof of payment as a reference to +264 81 448 9950.',
 })
 
-const line = reactive({
-  description: '',
-  quantity: 1,
-  unitPrice: 0,
-})
+// Populate form if editing
+onMounted(() => {
+  if (props.isEditing && props.editData) {
+    form.receiptCode = props.editData.receiptCode || ''
+    form.receiptType = props.editData.receiptType || 'payment'
+    form.paymentDate = props.editData.paymentDate ? 
+      new Date(props.editData.paymentDate).toISOString().slice(0, 10) : today
+    form.paymentMethod = props.editData.paymentMethod || 'bank_transfer'
+    form.amount = props.editData.amount || 0
+    form.currency = props.editData.currency || 'NAD'
+    form.status = props.editData.status || 'draft'
+    form.referenceNumber = props.editData.referenceNumber || ''
+    form.description = props.editData.description || ''
+    form.notes = props.editData.notes || ''
+    form.invoiceId = props.editData.invoiceId || ''
+    form.invoiceCode = props.editData.invoiceCode || ''
+    form.paymentId = props.editData.paymentId || ''
+    form.paymentCode = props.editData.paymentCode || ''
+    form.clientId = props.editData.clientId || ''
+    form.clientLabel = props.editData.clientLabel || ''
+    form.clientEmail = props.editData.clientEmail || ''
+    form.clientPhone = props.editData.clientPhone || ''
+    form.engagementId = props.editData.engagementId || ''
+    form.engagementCode = props.editData.engagementCode || ''
 
-const lineTotal = computed(() => {
-  return Number(line.quantity || 0) * Number(line.unitPrice || 0)
-})
-
-const estimatedTotal = computed(() => {
-  return Math.max(lineTotal.value - Number(form.discountAmount || 0), 0)
-})
-
-const estimatedTotalText = computed(() => {
-  return new Intl.NumberFormat('en-NA', {
-    style: 'currency',
-    currency: form.currency || 'NAD',
-    minimumFractionDigits: 2,
-  }).format(estimatedTotal.value)
+    if (form.clientId) {
+      clientMode.value = 'existing'
+      selectedClientId.value = form.clientId
+      selectedEngagementId.value = form.engagementId
+    }
+  }
 })
 
 function unwrapRecord(record) {
   const data = record?.data && typeof record.data === 'object' ? record.data : record
-
   return {
     id: record?.id || data?.id || record?.docId || record?._id,
     ...data,
@@ -573,7 +539,6 @@ function buildClientLabel(client) {
   const firstName = String(client?.firstName || '').trim()
   const lastName = String(client?.lastName || '').trim()
   const fullName = String(client?.fullName || '').trim()
-
   return [firstName, lastName].filter(Boolean).join(' ') || fullName || 'Unnamed client'
 }
 
@@ -581,9 +546,7 @@ function buildEngagementLabel(engagement) {
   return [
     engagement?.engagementCode,
     engagement?.title,
-  ]
-    .filter(Boolean)
-    .join(' — ') || 'Unnamed engagement'
+  ].filter(Boolean).join(' — ') || 'Unnamed engagement'
 }
 
 const normalizedClients = computed(() => {
@@ -608,7 +571,6 @@ const normalizedEngagements = computed(() => {
 
 const filteredEngagements = computed(() => {
   if (!selectedClientId.value) return []
-
   return normalizedEngagements.value.filter((engagement) => {
     return engagement.clientId === selectedClientId.value
   })
@@ -616,64 +578,43 @@ const filteredEngagements = computed(() => {
 
 function setClientMode(mode) {
   clientMode.value = mode
-
   selectedClientId.value = ''
   selectedEngagementId.value = ''
-
   form.clientId = ''
-  form.clientNumber = ''
   form.clientLabel = ''
   form.clientEmail = ''
   form.clientPhone = ''
   form.engagementId = ''
   form.engagementCode = ''
-
-  if (mode === 'manual') {
-    form.referenceLabel = 'Project'
-  }
 }
 
 function handleClientChange() {
   const client = normalizedClients.value.find((item) => item.id === selectedClientId.value)
-
   form.clientId = client?.id || ''
-  form.clientNumber = client?.clientNumber || ''
   form.clientLabel = client?.label || ''
   form.clientEmail = client?.email || ''
   form.clientPhone = client?.phone || ''
-
   selectedEngagementId.value = ''
   form.engagementId = ''
   form.engagementCode = ''
-  form.referenceLabel = 'Engagement'
-  form.referenceValue = ''
-
   emit('select-client', form.clientId)
 }
 
 function handleEngagementChange() {
   const engagement = filteredEngagements.value.find((item) => item.id === selectedEngagementId.value)
-
   form.engagementId = engagement?.id || ''
   form.engagementCode = engagement?.engagementCode || ''
-  form.referenceLabel = 'Engagement'
-  form.referenceValue = engagement?.engagementCode || engagement?.title || ''
-}
-
-function toIsoDate(value) {
-  return value ? `${value}T00:00:00.000Z` : null
 }
 
 function buildClientPayload() {
   if (clientMode.value === 'existing') {
     return {
       name: form.clientLabel,
-      number: form.clientNumber || form.clientId,
+      number: form.clientId,
       email: form.clientEmail,
       phone: form.clientPhone,
     }
   }
-
   return {
     name: manualClient.name,
     number: manualClient.number,
@@ -682,65 +623,29 @@ function buildClientPayload() {
   }
 }
 
-function termsList() {
-  return termsText.value
-    .split('\n')
-    .map((term) => term.trim())
-    .filter(Boolean)
+function toIsoDate(value) {
+  return value ? `${value}T00:00:00.000Z` : null
 }
 
 function submit() {
   const client = buildClientPayload()
-
+  
   emit('submit', {
-    quoteCode: form.quoteCode,
-    quotationCode: form.quoteCode,
-    status: form.status,
-    quoteDate: toIsoDate(form.quoteDate),
-    validUntil: toIsoDate(form.validUntil),
-
-    client,
-
-    clientId: form.clientId,
-    clientNumber: form.clientNumber,
+    ...form,
+    paymentDate: toIsoDate(form.paymentDate),
+    client: client,
     clientLabel: client.name,
     clientEmail: client.email,
     clientPhone: client.phone,
-
-    engagementId: form.engagementId,
-    engagementCode: form.engagementCode,
-
-    reference: {
-      label: form.referenceLabel || 'Project',
-      value: form.referenceValue || form.engagementCode || line.description,
-    },
-
-    lineItems: [
-      {
-        description: line.description,
-        quantity: Number(line.quantity || 1),
-        unitPrice: Number(line.unitPrice || 0),
-      },
-    ],
-
-    discountAmount: Number(form.discountAmount || 0),
-    depositAmount: Number(form.depositAmount || 0),
-    totalAmount: estimatedTotal.value,
-    currency: form.currency || 'NAD',
-    notes: form.notes,
-    terms: termsList(),
-    showAcceptance: true,
   })
 }
 </script>
 
 <style scoped>
-/* Smooth scroll for the form container */
 .max-h-\[92vh\] {
   scroll-behavior: smooth;
 }
 
-/* Custom scrollbar styling */
 .max-h-\[92vh\]::-webkit-scrollbar {
   width: 6px;
 }
@@ -758,7 +663,6 @@ function submit() {
   background: var(--color-text-light, #94A3B8);
 }
 
-/* Hide number input arrows */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -769,12 +673,10 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* Smooth transitions */
 input, select, textarea, button {
   transition: all 0.2s ease;
 }
 
-/* Loading spinner animation */
 @keyframes spin {
   from {
     transform: rotate(0deg);

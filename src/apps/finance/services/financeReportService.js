@@ -1,6 +1,14 @@
 /**
  * @file src/apps/finance/services/financeReportService.js
  * @description Ledger-derived finance reporting helpers.
+ *
+ * Date: 2026-07-08
+ * Changes:
+ *   - Fix TypeError in buildReceivablesReport overdueCount calculation by using toDateKey()
+ *   - Normalize issueDate and dueDate for sorting and comparisons to avoid non-string errors.
+ *   - Ensure all date operations use consistent YYYY-MM-DD strings.
+ * Reason: Invoice dueDate stored as Firestore Timestamp/Date object caused row.dueDate.slice to fail,
+ * crashing the FinanceReceivablesPage. Use the existing toDateKey helper for all date handling.
  */
 
 import { DEFAULT_SYSTEM_ACCOUNTS, mergeAccountCatalog, normalizeSystemAccountKey } from './financeChartOfAccounts.js'
@@ -214,8 +222,8 @@ export function buildReceivablesReport(invoices = [], allocations = []) {
       clientLabel: invoice.clientLabel || invoice.clientId,
       engagementId: invoice.engagementId || null,
       engagementCode: invoice.engagementCode || '',
-      issueDate: invoice.issueDate || null,
-      dueDate: invoice.dueDate || null,
+      issueDate: invoice.issueDate ? toDateKey(invoice.issueDate) : null,
+      dueDate: invoice.dueDate ? toDateKey(invoice.dueDate) : null,
       status: balanceAmount === 0 ? 'paid' : invoice.status,
       totalAmount: Number(Number(invoice.totalAmount || 0).toFixed(2)),
       allocatedAmount,
@@ -225,12 +233,15 @@ export function buildReceivablesReport(invoices = [], allocations = []) {
   })
 
   const openRows = rows.filter((row) => row.balanceAmount > 0)
+  const today = new Date().toISOString().slice(0, 10)
+
   return {
     rows: rows.sort((a, b) => String(b.issueDate || '').localeCompare(String(a.issueDate || ''))),
     openRows: openRows.sort((a, b) => String(a.dueDate || '').localeCompare(String(b.dueDate || ''))),
     totalInvoiced: Number(rows.reduce((sum, row) => sum + row.totalAmount, 0).toFixed(2)),
     totalAllocated: Number(rows.reduce((sum, row) => sum + row.allocatedAmount, 0).toFixed(2)),
     totalOutstanding: Number(openRows.reduce((sum, row) => sum + row.balanceAmount, 0).toFixed(2)),
-    overdueCount: openRows.filter((row) => row.dueDate && row.dueDate.slice(0, 10) < new Date().toISOString().slice(0, 10)).length,
+    // Fixed: use toDateKey normalized dueDate
+    overdueCount: openRows.filter((row) => row.dueDate && row.dueDate < today).length,
   }
 }

@@ -140,6 +140,44 @@ export const notificationEventRegistry = Object.freeze({
     priority: NOTIFICATION_PRIORITIES.CRITICAL,
     templateKey: 'system.alert',
   },
+
+  'finance.invoice.issued': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.NORMAL,
+    templateKey: 'finance.invoice.issued',
+  },
+  'finance.invoice.overdue': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.HIGH,
+    templateKey: 'finance.invoice.overdue',
+    actionRequired: true,
+  },
+  'finance.payment.received': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.NORMAL,
+    templateKey: 'finance.payment.received',
+  },
+  'finance.receipt.ready': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.LOW,
+    templateKey: 'finance.receipt.ready',
+  },
+  'finance.quotation.ready': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.NORMAL,
+    templateKey: 'finance.quotation.ready',
+  },
+  'finance.quotation.accepted': {
+    type: NOTIFICATION_TYPES.FINANCE,
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.EMAIL],
+    priority: NOTIFICATION_PRIORITIES.NORMAL,
+    templateKey: 'finance.quotation.accepted',
+  },
 })
 
 export const EMAIL_NOTIFICATION_EVENTS = Object.freeze(
